@@ -10,9 +10,15 @@ workflows:
       - name: Get Flutter packages
         script: |
           flutter pub get
-      - name: Build iOS IPA
+      - name: Build iOS without signing
         script: |
-          flutter build ipa --release
+          flutter build ios --release --no-codesign
+      - name: Package IPA manually
+        script: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r build/ios/ipa/solo_leveling_app.ipa Payload
+          rm -rf Payload
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
