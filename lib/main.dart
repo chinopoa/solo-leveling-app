@@ -41,19 +41,14 @@ void _registerAdapters() {
   Hive.registerAdapter(DailyQuestConfigAdapter());
   Hive.registerAdapter(DailyQuestProgressAdapter());
 
-  // 3. Shop & Inventory (ADD THESE LINES)
+  // 3. Shop & Inventory
   Hive.registerAdapter(ShopItemAdapter());
   Hive.registerAdapter(InventoryAdapter());
-  
-  // 4. Dungeons & Shadows (If you have these files, uncomment these lines later)
-  // Hive.registerAdapter(DungeonAdapter());
-  // Hive.registerAdapter(ShadowAdapter());
 
-  
-  // Note: As you build more features (Shop, Quests), you will need to 
-  // repeat Steps 1 & 2 for those models and register them here too:
-  // Hive.registerAdapter(ShopItemAdapter());
-  // Hive.registerAdapter(QuestAdapter());
+  // 4. Nutrition Tracking
+  Hive.registerAdapter(NutritionEntryAdapter());
+  Hive.registerAdapter(NutritionGoalsAdapter());
+  Hive.registerAdapter(MealTypeAdapter());
 }
 
 class SoloLevelingApp extends StatelessWidget {

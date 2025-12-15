@@ -11,6 +11,8 @@ class GameProvider extends ChangeNotifier {
   late Box<Inventory> _inventoryBox;
   late Box<DailyQuestConfig> _dailyConfigBox;
   late Box<DailyQuestProgress> _dailyProgressBox;
+  late Box<NutritionEntry> _nutritionEntryBox;
+  late Box<NutritionGoals> _nutritionGoalsBox;
 
   Player? _player;
   List<Quest> _quests = [];
@@ -21,6 +23,10 @@ class GameProvider extends ChangeNotifier {
   Inventory? _inventory;
   List<DailyQuestConfig> _dailyConfigs = [];
   DailyQuestProgress? _todayProgress;
+
+  // Nutrition tracking
+  List<NutritionEntry> _nutritionEntries = [];
+  NutritionGoals? _nutritionGoals;
 
   // Level up state
   bool _showLevelUp = false;
@@ -42,6 +48,35 @@ class GameProvider extends ChangeNotifier {
   Inventory? get inventory => _inventory;
   List<DailyQuestConfig> get dailyConfigs => _dailyConfigs;
   DailyQuestProgress? get todayProgress => _todayProgress;
+
+  // Nutrition getters
+  NutritionGoals get nutritionGoals => _nutritionGoals ?? NutritionGoals.defaults();
+  List<NutritionEntry> get allNutritionEntries => _nutritionEntries;
+
+  List<NutritionEntry> get todayNutritionEntries {
+    final todayKey = NutritionEntry.getTodayKey();
+    return _nutritionEntries.where((e) => e.date == todayKey).toList();
+  }
+
+  // Today's nutrition totals
+  double get todayCalories => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalCalories);
+  double get todayProtein => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalProtein);
+  double get todayCarbs => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalCarbs);
+  double get todayFat => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalFat);
+  double get todayFiber => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalFiber);
+  double get todaySugar => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalSugar);
+  double get todaySodium => todayNutritionEntries.fold(0, (sum, e) => sum + e.totalSodium);
+
+  // Check if nutrition goal is met (for daily quest)
+  bool get isNutritionGoalMet {
+    if (!nutritionGoals.isEnabled) return true;
+    return nutritionGoals.isCalorieGoalMet(todayCalories);
+  }
+
+  // Get entries by meal type
+  List<NutritionEntry> getEntriesByMealType(MealType mealType) {
+    return todayNutritionEntries.where((e) => e.mealType == mealType).toList();
+  }
 
   bool get showLevelUp => _showLevelUp;
   int get levelUpNewLevel => _levelUpNewLevel;
@@ -72,6 +107,8 @@ class GameProvider extends ChangeNotifier {
     _inventoryBox = await Hive.openBox<Inventory>('inventory');
     _dailyConfigBox = await Hive.openBox<DailyQuestConfig>('dailyConfigs');
     _dailyProgressBox = await Hive.openBox<DailyQuestProgress>('dailyProgress');
+    _nutritionEntryBox = await Hive.openBox<NutritionEntry>('nutritionEntries');
+    _nutritionGoalsBox = await Hive.openBox<NutritionGoals>('nutritionGoals');
 
     await _loadData();
   }
@@ -120,7 +157,23 @@ class GameProvider extends ChangeNotifier {
     // Load or create today's progress
     await _loadTodayProgress();
 
+    // Load nutrition data
+    await _loadNutritionData();
+
     notifyListeners();
+  }
+
+  Future<void> _loadNutritionData() async {
+    // Load all nutrition entries
+    _nutritionEntries = _nutritionEntryBox.values.toList();
+
+    // Load or create nutrition goals
+    if (_nutritionGoalsBox.isEmpty) {
+      _nutritionGoals = NutritionGoals.defaults();
+      await _nutritionGoalsBox.put('goals', _nutritionGoals!);
+    } else {
+      _nutritionGoals = _nutritionGoalsBox.get('goals');
+    }
   }
 
   Future<void> _loadTodayProgress() async {
@@ -387,6 +440,67 @@ class GameProvider extends ChangeNotifier {
       _dailyConfigs[index] = config;
     } else {
       _dailyConfigs.add(config);
+    }
+    notifyListeners();
+  }
+
+  // ==================== NUTRITION TRACKING ====================
+
+  // Add a nutrition entry
+  Future<void> addNutritionEntry(NutritionEntry entry) async {
+    await _nutritionEntryBox.put(entry.id, entry);
+    _nutritionEntries.add(entry);
+
+    // Check if nutrition goal was just met
+    if (nutritionGoals.isEnabled && isNutritionGoalMet) {
+      // Award VIT stat bonus (similar to completing a daily quest)
+      // The actual stat increase is handled through the daily quest system
+    }
+
+    notifyListeners();
+  }
+
+  // Update a nutrition entry
+  Future<void> updateNutritionEntry(NutritionEntry entry) async {
+    await _nutritionEntryBox.put(entry.id, entry);
+    final index = _nutritionEntries.indexWhere((e) => e.id == entry.id);
+    if (index >= 0) {
+      _nutritionEntries[index] = entry;
+    }
+    notifyListeners();
+  }
+
+  // Delete a nutrition entry
+  Future<void> deleteNutritionEntry(String entryId) async {
+    await _nutritionEntryBox.delete(entryId);
+    _nutritionEntries.removeWhere((e) => e.id == entryId);
+    notifyListeners();
+  }
+
+  // Update nutrition goals
+  Future<void> updateNutritionGoals(NutritionGoals goals) async {
+    _nutritionGoals = goals;
+    await _nutritionGoalsBox.put('goals', goals);
+    notifyListeners();
+  }
+
+  // Clear old nutrition entries (keep last 30 days)
+  Future<void> cleanupOldNutritionEntries() async {
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    final oldEntries = _nutritionEntries.where((e) {
+      final parts = e.date.split('-');
+      if (parts.length != 3) return false;
+      final date = DateTime(
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        int.parse(parts[2]),
+      );
+      return date.isBefore(thirtyDaysAgo);
+    }).toList();
+
+    for (final entry in oldEntries) {
+      await _nutritionEntryBox.delete(entry.id);
+      _nutritionEntries.remove(entry);
     }
     notifyListeners();
   }
