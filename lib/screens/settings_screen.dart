@@ -484,9 +484,9 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
 
   String _gender = 'male';
   String _activityLevel = 'moderate';
-  String _goal = 'maintain';
+  String _weightChangeRate = '0.5'; // kg per week
 
-  Map<String, double>? _results;
+  Map<String, dynamic>? _results;
 
   final Map<String, double> _activityMultipliers = {
     'sedentary': 1.2,
@@ -504,14 +504,22 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
     'very_active': 'Very Active (2x/day)',
   };
 
+  final Map<String, String> _rateLabels = {
+    '0.25': '0.25 kg/week (slow)',
+    '0.5': '0.5 kg/week (moderate)',
+    '0.75': '0.75 kg/week (fast)',
+    '1.0': '1.0 kg/week (aggressive)',
+  };
+
   void _calculate() {
     final weight = double.tryParse(_weightController.text);
     final height = double.tryParse(_heightController.text);
     final age = int.tryParse(_ageController.text);
+    final targetWeight = double.tryParse(_targetWeightController.text);
 
     if (weight == null || height == null || age == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
+        const SnackBar(content: Text('Please fill in weight, height, and age')),
       );
       return;
     }
@@ -524,37 +532,71 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
       bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
     }
 
-    // Apply activity multiplier
+    // Apply activity multiplier to get TDEE (maintenance calories)
     final tdee = bmr * _activityMultipliers[_activityLevel]!;
 
-    // Adjust for goal
+    // Determine goal and calculate calories
     double targetCalories;
-    switch (_goal) {
-      case 'lose':
-        targetCalories = tdee - 500; // 0.5kg/week loss
-        break;
-      case 'gain':
-        targetCalories = tdee + 500; // 0.5kg/week gain
-        break;
-      default:
-        targetCalories = tdee;
+    double weightDiff = 0;
+    int weeksToGoal = 0;
+    String goalType = 'maintain';
+    double weeklyChange = double.parse(_weightChangeRate);
+
+    if (targetWeight != null && targetWeight != weight) {
+      weightDiff = targetWeight - weight;
+
+      if (weightDiff > 0) {
+        // Gaining weight
+        goalType = 'gain';
+        // 7700 kcal ≈ 1 kg of body weight
+        final dailySurplus = (weeklyChange * 7700) / 7;
+        targetCalories = tdee + dailySurplus;
+        weeksToGoal = (weightDiff / weeklyChange).ceil();
+      } else {
+        // Losing weight
+        goalType = 'lose';
+        final dailyDeficit = (weeklyChange * 7700) / 7;
+        targetCalories = tdee - dailyDeficit;
+        weeksToGoal = (weightDiff.abs() / weeklyChange).ceil();
+      }
+    } else {
+      targetCalories = tdee;
     }
 
-    // Calculate macros
-    // Protein: 2g per kg body weight for active people
+    // Ensure minimum calories for health
+    if (targetCalories < 1200) {
+      targetCalories = 1200;
+    }
+
+    // Calculate macros based on target weight (or current if maintaining)
+    final proteinWeight = targetWeight ?? weight;
+    // Protein: 2g per kg for muscle building/preservation
+    final protein = proteinWeight * 2;
     // Fat: 25% of calories
-    // Carbs: remaining calories
-    final protein = weight * 2;
     final fat = (targetCalories * 0.25) / 9;
+    // Carbs: remaining calories
     final carbCalories = targetCalories - (protein * 4) - (fat * 9);
-    final carbs = carbCalories / 4;
+    final carbs = (carbCalories / 4).clamp(50, double.infinity);
+
+    // Calculate goal date
+    final goalDate = weeksToGoal > 0
+        ? DateTime.now().add(Duration(days: weeksToGoal * 7))
+        : null;
 
     setState(() {
       _results = {
+        'tdee': tdee,
         'calories': targetCalories,
         'protein': protein,
-        'carbs': carbs.clamp(0, double.infinity),
+        'carbs': carbs,
         'fat': fat,
+        'goalType': goalType,
+        'weightDiff': weightDiff,
+        'weeksToGoal': weeksToGoal,
+        'goalDate': goalDate,
+        'currentWeight': weight,
+        'targetWeight': targetWeight,
+        'weeklyChange': weeklyChange,
       };
     });
   }
@@ -565,10 +607,10 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
     final game = context.read<GameProvider>();
     final currentGoals = game.nutritionGoals;
     final updatedGoals = currentGoals.copyWith(
-      dailyCalories: _results!['calories']!.round(),
-      dailyProtein: _results!['protein']!.round(),
-      dailyCarbs: _results!['carbs']!.round(),
-      dailyFat: _results!['fat']!.round(),
+      dailyCalories: (_results!['calories'] as double).round(),
+      dailyProtein: (_results!['protein'] as double).round(),
+      dailyCarbs: (_results!['carbs'] as double).round(),
+      dailyFat: (_results!['fat'] as double).round(),
     );
     game.updateNutritionGoals(updatedGoals);
 
@@ -593,13 +635,13 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Input fields
+        // Basic info row
         Row(
           children: [
             Expanded(
               child: _InputField(
                 controller: _weightController,
-                label: 'Weight (kg)',
+                label: 'Current (kg)',
                 hint: '70',
               ),
             ),
@@ -617,6 +659,21 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
                 controller: _ageController,
                 label: 'Age',
                 hint: '25',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Target weight row
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: _InputField(
+                controller: _targetWeightController,
+                label: 'Target Weight (kg)',
+                hint: '75 (leave empty to maintain)',
               ),
             ),
           ],
@@ -686,37 +743,40 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
         ),
         const SizedBox(height: 12),
 
-        // Goal
-        Row(
-          children: [
-            Text(
-              'Goal: ',
-              style: TextStyle(
-                color: SoloLevelingTheme.textMuted,
-                fontSize: 12,
-              ),
+        // Weight change rate
+        Text(
+          'Weight Change Rate:',
+          style: TextStyle(
+            color: SoloLevelingTheme.textMuted,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: SoloLevelingTheme.primaryCyan.withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: DropdownButton<String>(
+            value: _weightChangeRate,
+            isExpanded: true,
+            dropdownColor: SoloLevelingTheme.backgroundCard,
+            underline: const SizedBox(),
+            style: TextStyle(
+              color: SoloLevelingTheme.textPrimary,
+              fontSize: 12,
             ),
-            const SizedBox(width: 8),
-            _SelectButton(
-              label: 'Lose',
-              isSelected: _goal == 'lose',
-              onTap: () => setState(() => _goal = 'lose'),
-              color: SoloLevelingTheme.hpRed,
-            ),
-            const SizedBox(width: 8),
-            _SelectButton(
-              label: 'Maintain',
-              isSelected: _goal == 'maintain',
-              onTap: () => setState(() => _goal = 'maintain'),
-            ),
-            const SizedBox(width: 8),
-            _SelectButton(
-              label: 'Gain',
-              isSelected: _goal == 'gain',
-              onTap: () => setState(() => _goal = 'gain'),
-              color: SoloLevelingTheme.successGreen,
-            ),
-          ],
+            items: _rateLabels.entries.map((e) {
+              return DropdownMenuItem(
+                value: e.key,
+                child: Text(e.value),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _weightChangeRate = value);
+            },
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -747,6 +807,12 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
         // Results
         if (_results != null) ...[
           const SizedBox(height: 16),
+
+          // Goal summary
+          _buildGoalSummary(vitColor),
+          const SizedBox(height: 12),
+
+          // Daily intake
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -757,7 +823,7 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
             child: Column(
               children: [
                 Text(
-                  'RECOMMENDED DAILY INTAKE',
+                  'DAILY INTAKE TO REACH GOAL',
                   style: TextStyle(
                     color: vitColor,
                     fontSize: 12,
@@ -771,29 +837,37 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
                   children: [
                     _ResultItem(
                       label: 'CALORIES',
-                      value: '${_results!['calories']!.round()}',
+                      value: '${(_results!['calories'] as double).round()}',
                       unit: 'kcal',
                       color: vitColor,
                     ),
                     _ResultItem(
                       label: 'PROTEIN',
-                      value: '${_results!['protein']!.round()}',
+                      value: '${(_results!['protein'] as double).round()}',
                       unit: 'g',
                       color: vitColor,
                     ),
                     _ResultItem(
                       label: 'CARBS',
-                      value: '${_results!['carbs']!.round()}',
+                      value: '${(_results!['carbs'] as double).round()}',
                       unit: 'g',
                       color: vitColor,
                     ),
                     _ResultItem(
                       label: 'FAT',
-                      value: '${_results!['fat']!.round()}',
+                      value: '${(_results!['fat'] as double).round()}',
                       unit: 'g',
                       color: vitColor,
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Maintenance: ${(_results!['tdee'] as double).round()} kcal/day',
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted,
+                    fontSize: 10,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
@@ -821,6 +895,223 @@ class _CalorieCalculatorState extends State<_CalorieCalculator> {
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildGoalSummary(Color vitColor) {
+    final goalType = _results!['goalType'] as String;
+    final weightDiff = _results!['weightDiff'] as double;
+    final weeksToGoal = _results!['weeksToGoal'] as int;
+    final goalDate = _results!['goalDate'] as DateTime?;
+    final currentWeight = _results!['currentWeight'] as double;
+    final targetWeight = _results!['targetWeight'] as double?;
+    final weeklyChange = _results!['weeklyChange'] as double;
+    final calories = _results!['calories'] as double;
+    final tdee = _results!['tdee'] as double;
+
+    Color goalColor;
+    IconData goalIcon;
+    String goalText;
+    String detailText;
+
+    if (goalType == 'maintain') {
+      goalColor = SoloLevelingTheme.primaryCyan;
+      goalIcon = Icons.balance;
+      goalText = 'MAINTAIN WEIGHT';
+      detailText = 'Stay at ${currentWeight.toStringAsFixed(1)} kg';
+    } else if (goalType == 'gain') {
+      goalColor = SoloLevelingTheme.successGreen;
+      goalIcon = Icons.trending_up;
+      goalText = 'GAIN ${weightDiff.toStringAsFixed(1)} KG';
+      final surplus = (calories - tdee).round();
+      detailText = '+$surplus kcal/day surplus';
+    } else {
+      goalColor = SoloLevelingTheme.hpRed;
+      goalIcon = Icons.trending_down;
+      goalText = 'LOSE ${weightDiff.abs().toStringAsFixed(1)} KG';
+      final deficit = (tdee - calories).round();
+      detailText = '-$deficit kcal/day deficit';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: goalColor.withOpacity(0.1),
+        border: Border.all(color: goalColor.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(goalIcon, color: goalColor, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                goalText,
+                style: TextStyle(
+                  color: goalColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            detailText,
+            style: TextStyle(
+              color: goalColor.withOpacity(0.8),
+              fontSize: 12,
+            ),
+          ),
+          if (goalType != 'maintain' && goalDate != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: SoloLevelingTheme.backgroundElevated,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _TimelineItem(
+                        label: 'NOW',
+                        value: '${currentWeight.toStringAsFixed(1)} kg',
+                        color: SoloLevelingTheme.textMuted,
+                      ),
+                      Icon(
+                        Icons.arrow_forward,
+                        color: goalColor,
+                        size: 20,
+                      ),
+                      _TimelineItem(
+                        label: 'GOAL',
+                        value: '${targetWeight?.toStringAsFixed(1)} kg',
+                        color: goalColor,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Divider(color: goalColor.withOpacity(0.3), height: 1),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          Text(
+                            '$weeksToGoal',
+                            style: TextStyle(
+                              color: goalColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'WEEKS',
+                            style: TextStyle(
+                              color: SoloLevelingTheme.textMuted,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            '${(weeksToGoal / 4.33).toStringAsFixed(1)}',
+                            style: TextStyle(
+                              color: goalColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'MONTHS',
+                            style: TextStyle(
+                              color: SoloLevelingTheme.textMuted,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            '${goalDate.day}/${goalDate.month}',
+                            style: TextStyle(
+                              color: goalColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'TARGET DATE',
+                            style: TextStyle(
+                              color: SoloLevelingTheme.textMuted,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '@ ${weeklyChange.toStringAsFixed(2)} kg/week',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _TimelineItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: SoloLevelingTheme.textMuted,
+            fontSize: 9,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
