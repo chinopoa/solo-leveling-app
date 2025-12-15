@@ -34,6 +34,25 @@ class DailyQuestConfig extends HiveObject {
     this.order = 0,
   });
 
+  /// Copy with modifications
+  DailyQuestConfig copyWith({
+    String? id,
+    String? title,
+    int? targetCount,
+    String? statBonus,
+    bool? isEnabled,
+    int? order,
+  }) {
+    return DailyQuestConfig(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      targetCount: targetCount ?? this.targetCount,
+      statBonus: statBonus ?? this.statBonus,
+      isEnabled: isEnabled ?? this.isEnabled,
+      order: order ?? this.order,
+    );
+  }
+
   Quest toQuest() {
     return Quest.createWithDifficulty(
       title: title,

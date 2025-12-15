@@ -504,4 +504,50 @@ class GameProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  // ==================== RESET METHODS ====================
+
+  // Reset today's daily quest progress
+  Future<void> resetTodayProgress() async {
+    final todayKey = DailyQuestProgress.getTodayKey();
+    _todayProgress = DailyQuestProgress(date: todayKey);
+    await _dailyProgressBox.put(todayKey, _todayProgress!);
+
+    // Reset daily quest counts
+    for (final quest in _dailyQuests) {
+      quest.currentCount = 0;
+      quest.status = 'active';
+      quest.completedAt = null;
+    }
+
+    notifyListeners();
+  }
+
+  // Reset all data - DANGER
+  Future<void> resetAllData() async {
+    // Clear all boxes
+    await _playerBox.clear();
+    await _questBox.clear();
+    await _dungeonBox.clear();
+    await _shadowBox.clear();
+    await _inventoryBox.clear();
+    await _dailyProgressBox.clear();
+    await _nutritionEntryBox.clear();
+    await _nutritionGoalsBox.clear();
+
+    // Reset daily configs to defaults
+    await _dailyConfigBox.clear();
+    for (final config in DailyQuestConfig.getDefaults()) {
+      await _dailyConfigBox.put(config.id, config);
+    }
+
+    // Reset shop items to defaults
+    await _shopItemBox.clear();
+    for (final item in ShopItem.getDefaultItems()) {
+      await _shopItemBox.put(item.id, item);
+    }
+
+    // Reload all data
+    await _loadData();
+  }
 }

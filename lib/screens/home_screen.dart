@@ -7,7 +7,7 @@ import 'status_screen.dart';
 import 'daily_quest_screen.dart';
 import 'quests_screen.dart';
 import 'shop_screen.dart';
-import 'shadow_army_screen.dart';
+import 'settings_screen.dart';
 
 /// Main home screen with bottom navigation
 class HomeScreen extends StatefulWidget {
@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
     DailyQuestScreen(),
     QuestsScreen(),
     ShopScreen(),
-    ShadowArmyScreen(),
+    SettingsScreen(),
   ];
 
   final List<String> _titles = const [
@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'DAILY QUEST',
     'QUESTS',
     'SHOP',
-    'SHADOW ARMY',
+    'SETTINGS',
   ];
 
   @override
@@ -112,8 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: 'Shop',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.groups),
-                      label: 'Shadows',
+                      icon: Icon(Icons.settings),
+                      label: 'Settings',
                     ),
                   ],
                 ),
