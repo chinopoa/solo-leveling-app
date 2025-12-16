@@ -285,6 +285,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _exportData(BuildContext context, GameProvider game) async {
+    // Get the render box for iOS share sheet positioning before async gap
+    final box = context.findRenderObject() as RenderBox?;
+    final sharePositionOrigin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : const Rect.fromLTWH(0, 0, 100, 100);
+
     try {
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
@@ -299,6 +305,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         [XFile(filePath)],
         subject: 'Solo Leveling Backup',
         text: 'My Solo Leveling app backup',
+        sharePositionOrigin: sharePositionOrigin,
       );
 
       if (context.mounted) {
