@@ -212,10 +212,11 @@ class StatusScreen extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _QuickStatCard(
-            icon: Icons.people,
-            label: 'SHADOWS',
-            value: game.shadows.length.toString(),
-            color: SoloLevelingTheme.shadowPurple,
+            icon: Icons.restaurant,
+            label: 'CALORIES',
+            value: '${game.todayCalories.round()}',
+            subValue: '/ ${game.nutritionGoals.dailyCalories}',
+            color: SoloLevelingTheme.getStatColor('VIT'),
           ),
         ),
       ],
@@ -227,12 +228,14 @@ class _QuickStatCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final String? subValue;
   final Color color;
 
   const _QuickStatCard({
     required this.icon,
     required this.label,
     required this.value,
+    this.subValue,
     required this.color,
   });
 
@@ -249,13 +252,26 @@ class _QuickStatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (subValue != null)
+                Text(
+                  subValue!,
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+            ],
           ),
           Text(
             label,
