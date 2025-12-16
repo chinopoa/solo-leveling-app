@@ -47,5 +47,11 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to scan food barcodes for nutrition tracking.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to set your profile picture.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>
