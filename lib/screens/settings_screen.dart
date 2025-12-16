@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
 import '../widgets/widgets.dart';
@@ -54,6 +56,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 16),
+
+              // Profile Picture Section
+              SystemWindow(
+                title: 'PROFILE PICTURE',
+                child: _buildProfileSection(context, game),
               ),
               const SizedBox(height: 16),
 
@@ -423,6 +432,143 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildProfileSection(BuildContext context, GameProvider game) {
+    final player = game.player;
+    final hasProfileImage = player?.profileImagePath != null;
+
+    return Row(
+      children: [
+        // Profile picture preview
+        Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: SoloLevelingTheme.primaryCyan,
+              width: 2,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: hasProfileImage
+                ? Image.file(
+                    File(player!.profileImagePath!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _buildProfilePlaceholder(),
+                  )
+                : _buildProfilePlaceholder(),
+          ),
+        ),
+        const SizedBox(width: 16),
+        // Change button
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hasProfileImage ? 'Current profile picture' : 'No profile picture set',
+                style: TextStyle(
+                  color: SoloLevelingTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _pickProfileImage(context, game),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
+                    border: Border.all(color: SoloLevelingTheme.primaryCyan),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.camera_alt,
+                        color: SoloLevelingTheme.primaryCyan,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        hasProfileImage ? 'CHANGE PICTURE' : 'SET PICTURE',
+                        style: const TextStyle(
+                          color: SoloLevelingTheme.primaryCyan,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfilePlaceholder() {
+    return Container(
+      color: SoloLevelingTheme.backgroundElevated,
+      child: const Center(
+        child: Icon(
+          Icons.person,
+          color: SoloLevelingTheme.textMuted,
+          size: 32,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickProfileImage(BuildContext context, GameProvider game) async {
+    final picker = ImagePicker();
+
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text(
+          'Change Profile Picture',
+          style: TextStyle(color: SoloLevelingTheme.primaryCyan),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: SoloLevelingTheme.primaryCyan),
+              title: const Text('Choose from Gallery', style: TextStyle(color: SoloLevelingTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: SoloLevelingTheme.primaryCyan),
+              title: const Text('Take a Photo', style: TextStyle(color: SoloLevelingTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final XFile? image = await picker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+
+    if (image != null) {
+      await game.updateProfileImage(image.path);
+    }
   }
 }
 
