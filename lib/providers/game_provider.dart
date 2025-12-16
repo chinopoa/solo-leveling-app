@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
 class GameProvider extends ChangeNotifier {
@@ -35,6 +36,11 @@ class GameProvider extends ChangeNotifier {
   bool _showLevelUp = false;
   int _levelUpNewLevel = 0;
   int _levelUpPointsGained = 0;
+
+  // Auto-backup
+  bool _autoBackupEnabled = false;
+  DateTime? _lastAutoBackup;
+  static const _autoBackupKey = 'auto_backup_enabled';
 
   // Getters
   Player? get player => _player;
@@ -84,6 +90,7 @@ class GameProvider extends ChangeNotifier {
   bool get showLevelUp => _showLevelUp;
   int get levelUpNewLevel => _levelUpNewLevel;
   int get levelUpPointsGained => _levelUpPointsGained;
+  bool get autoBackupEnabled => _autoBackupEnabled;
 
   // Time until daily reset
   Duration get timeUntilReset {
@@ -112,6 +119,10 @@ class GameProvider extends ChangeNotifier {
     _dailyProgressBox = await Hive.openBox<DailyQuestProgress>('dailyProgress');
     _nutritionEntryBox = await Hive.openBox<NutritionEntry>('nutritionEntries');
     _nutritionGoalsBox = await Hive.openBox<NutritionGoals>('nutritionGoals');
+
+    // Load auto-backup setting
+    final prefs = await SharedPreferences.getInstance();
+    _autoBackupEnabled = prefs.getBool(_autoBackupKey) ?? false;
 
     await _loadData();
   }
@@ -206,12 +217,74 @@ class GameProvider extends ChangeNotifier {
     }
   }
 
+  // Auto-backup methods
+  Future<void> setAutoBackup(bool enabled) async {
+    _autoBackupEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoBackupKey, enabled);
+    notifyListeners();
+
+    // Perform immediate backup when enabled
+    if (enabled) {
+      await _performAutoBackup();
+    }
+  }
+
+  Future<void> _performAutoBackup() async {
+    if (!_autoBackupEnabled) return;
+
+    // Throttle backups to at most once per minute
+    if (_lastAutoBackup != null &&
+        DateTime.now().difference(_lastAutoBackup!) < const Duration(minutes: 1)) {
+      return;
+    }
+
+    try {
+      final jsonData = await exportData();
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/solo_leveling_auto_backup.json');
+      await file.writeAsString(jsonData);
+      _lastAutoBackup = DateTime.now();
+      debugPrint('Auto-backup saved');
+    } catch (e) {
+      debugPrint('Auto-backup failed: $e');
+    }
+  }
+
+  /// Get the path to the auto-backup file (for restore)
+  Future<String?> getAutoBackupPath() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/solo_leveling_auto_backup.json');
+    if (await file.exists()) {
+      return file.path;
+    }
+    return null;
+  }
+
+  /// Check when the last auto-backup was made
+  Future<DateTime?> getLastAutoBackupTime() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/solo_leveling_auto_backup.json');
+    if (await file.exists()) {
+      return await file.lastModified();
+    }
+    return null;
+  }
+
+  // Trigger auto-backup after data changes
+  void _triggerAutoBackup() {
+    if (_autoBackupEnabled) {
+      _performAutoBackup();
+    }
+  }
+
   // Create new player (onboarding)
   Future<void> createPlayer(String name) async {
     _player = Player(name: name);
     await _playerBox.add(_player!);
     await _loadTodayProgress();
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Add XP and handle level up
@@ -268,6 +341,7 @@ class GameProvider extends ChangeNotifier {
     _player!.profileImagePath = newPath;
     await _player!.save();
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Update player name
@@ -276,6 +350,7 @@ class GameProvider extends ChangeNotifier {
     _player!.name = newName.trim();
     await _player!.save();
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Quest management
@@ -296,6 +371,7 @@ class GameProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   Future<void> incrementQuestProgress(Quest quest, [int amount = 1]) async {
@@ -338,6 +414,7 @@ class GameProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Dungeon management
@@ -500,6 +577,7 @@ class GameProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Update a nutrition entry
@@ -510,6 +588,7 @@ class GameProvider extends ChangeNotifier {
       _nutritionEntries[index] = entry;
     }
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Delete a nutrition entry
@@ -517,6 +596,7 @@ class GameProvider extends ChangeNotifier {
     await _nutritionEntryBox.delete(entryId);
     _nutritionEntries.removeWhere((e) => e.id == entryId);
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Update nutrition goals
@@ -524,6 +604,7 @@ class GameProvider extends ChangeNotifier {
     _nutritionGoals = goals;
     await _nutritionGoalsBox.put('goals', goals);
     notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Clear old nutrition entries (keep last 30 days)

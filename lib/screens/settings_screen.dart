@@ -158,6 +158,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: 'DATA BACKUP',
                 child: Column(
                   children: [
+                    // Auto-backup toggle
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: game.autoBackupEnabled
+                            ? SoloLevelingTheme.successGreen.withOpacity(0.1)
+                            : SoloLevelingTheme.backgroundElevated,
+                        border: Border.all(
+                          color: game.autoBackupEnabled
+                              ? SoloLevelingTheme.successGreen.withOpacity(0.5)
+                              : SoloLevelingTheme.primaryCyan.withOpacity(0.3),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            game.autoBackupEnabled ? Icons.backup : Icons.backup_outlined,
+                            color: game.autoBackupEnabled
+                                ? SoloLevelingTheme.successGreen
+                                : SoloLevelingTheme.primaryCyan,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Auto-Backup',
+                                  style: TextStyle(
+                                    color: game.autoBackupEnabled
+                                        ? SoloLevelingTheme.successGreen
+                                        : SoloLevelingTheme.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  game.autoBackupEnabled
+                                      ? 'Your data is being saved automatically'
+                                      : 'Enable to automatically save your progress',
+                                  style: TextStyle(
+                                    color: SoloLevelingTheme.textMuted,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: game.autoBackupEnabled,
+                            onChanged: (value) => game.setAutoBackup(value),
+                            activeColor: SoloLevelingTheme.successGreen,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (game.autoBackupEnabled) ...[
+                      const SizedBox(height: 8),
+                      FutureBuilder<DateTime?>(
+                        future: game.getLastAutoBackupTime(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data != null) {
+                            final time = snapshot.data!;
+                            final formatted = '${time.day}/${time.month}/${time.year} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                            return Text(
+                              'Last auto-backup: $formatted',
+                              style: TextStyle(
+                                color: SoloLevelingTheme.textMuted,
+                                fontSize: 10,
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -169,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.cloud_upload,
                             color: SoloLevelingTheme.primaryCyan,
                             size: 20,
