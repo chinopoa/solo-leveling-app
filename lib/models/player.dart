@@ -57,6 +57,9 @@ class Player extends HiveObject {
   @HiveField(16)
   PlayerStats stats;
 
+  @HiveField(17)
+  String? profileImagePath;
+
   Player({
     required this.name,
     this.level = 1,
@@ -75,6 +78,7 @@ class Player extends HiveObject {
     DateTime? lastDailyCompletion,
     List<String>? unlockedTitles,
     PlayerStats? stats,
+    this.profileImagePath,
   })  : lastDailyCompletion = lastDailyCompletion ?? DateTime.now(),
         unlockedTitles = unlockedTitles ?? ['The Weakest'],
         stats = stats ?? PlayerStats();
@@ -203,6 +207,7 @@ class Player extends HiveObject {
         'lastDailyCompletion': lastDailyCompletion.toIso8601String(),
         'unlockedTitles': unlockedTitles,
         'stats': stats.toJson(),
+        'profileImagePath': profileImagePath,
       };
 
   factory Player.fromJson(Map<String, dynamic> json) => Player(
@@ -227,6 +232,7 @@ class Player extends HiveObject {
         stats: json['stats'] != null
             ? PlayerStats.fromJson(json['stats'])
             : PlayerStats(),
+        profileImagePath: json['profileImagePath'],
       );
 }
 

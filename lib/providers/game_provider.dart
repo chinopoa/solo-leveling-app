@@ -239,6 +239,37 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Update profile image
+  Future<void> updateProfileImage(String imagePath) async {
+    if (_player == null) return;
+
+    // Copy image to app documents directory for persistence
+    final directory = await getApplicationDocumentsDirectory();
+    final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final newPath = '${directory.path}/$fileName';
+
+    // Copy the file
+    final originalFile = File(imagePath);
+    await originalFile.copy(newPath);
+
+    // Delete old profile image if exists
+    if (_player!.profileImagePath != null) {
+      try {
+        final oldFile = File(_player!.profileImagePath!);
+        if (await oldFile.exists()) {
+          await oldFile.delete();
+        }
+      } catch (e) {
+        debugPrint('Could not delete old profile image: $e');
+      }
+    }
+
+    // Update player
+    _player!.profileImagePath = newPath;
+    await _player!.save();
+    notifyListeners();
+  }
+
   // Quest management
   Future<void> addQuest(Quest quest) async {
     await _questBox.put(quest.id, quest);

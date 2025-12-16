@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
 import '../widgets/widgets.dart';
@@ -7,6 +9,50 @@ import '../widgets/widgets.dart';
 /// The main Status Window - shows player stats like Jinwoo's HUD
 class StatusScreen extends StatelessWidget {
   const StatusScreen({super.key});
+
+  Future<void> _pickProfileImage(BuildContext context, GameProvider game) async {
+    final picker = ImagePicker();
+
+    // Show options dialog
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text(
+          'Change Profile Picture',
+          style: TextStyle(color: SoloLevelingTheme.primaryCyan),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: SoloLevelingTheme.primaryCyan),
+              title: const Text('Choose from Gallery', style: TextStyle(color: SoloLevelingTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: SoloLevelingTheme.primaryCyan),
+              title: const Text('Take a Photo', style: TextStyle(color: SoloLevelingTheme.textPrimary)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final XFile? image = await picker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+
+    if (image != null) {
+      await game.updateProfileImage(image.path);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +74,7 @@ class StatusScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Player Info Card
-              _buildPlayerInfo(player),
+              _buildPlayerInfo(context, player, game),
               const SizedBox(height: 16),
 
               // HP, MP, Fatigue bars
@@ -63,7 +109,9 @@ class StatusScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlayerInfo(player) {
+  Widget _buildPlayerInfo(BuildContext context, player, GameProvider game) {
+    final hasProfileImage = player.profileImagePath != null;
+
     return SystemWindow(
       title: 'STATUS WINDOW',
       child: Column(
@@ -96,34 +144,99 @@ class StatusScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Rank badge
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: SoloLevelingTheme.getRankColor(player.rank),
-                    width: 2,
-                  ),
-                  boxShadow: SoloLevelingTheme.glowEffect(
-                    SoloLevelingTheme.getRankColor(player.rank),
-                    intensity: 0.5,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    player.rank,
-                    style: TextStyle(
-                      color: SoloLevelingTheme.getRankColor(player.rank),
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+              // Profile picture / Rank badge
+              GestureDetector(
+                onTap: () => _pickProfileImage(context, game),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: SoloLevelingTheme.getRankColor(player.rank),
+                          width: 2,
+                        ),
+                        boxShadow: SoloLevelingTheme.glowEffect(
+                          SoloLevelingTheme.getRankColor(player.rank),
+                          intensity: 0.5,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: hasProfileImage
+                            ? Image.file(
+                                File(player.profileImagePath!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildRankFallback(player),
+                              )
+                            : _buildRankFallback(player),
+                      ),
                     ),
-                  ),
+                    // Rank badge overlay
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: SoloLevelingTheme.backgroundCard,
+                          border: Border.all(
+                            color: SoloLevelingTheme.getRankColor(player.rank),
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          player.rank,
+                          style: TextStyle(
+                            color: SoloLevelingTheme.getRankColor(player.rank),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Camera icon hint
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: SoloLevelingTheme.backgroundCard.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Icon(
+                          Icons.camera_alt,
+                          color: SoloLevelingTheme.primaryCyan,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRankFallback(player) {
+    return Container(
+      color: SoloLevelingTheme.backgroundElevated,
+      child: Center(
+        child: Text(
+          player.rank,
+          style: TextStyle(
+            color: SoloLevelingTheme.getRankColor(player.rank),
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

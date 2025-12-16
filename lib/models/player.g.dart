@@ -34,13 +34,14 @@ class PlayerAdapter extends TypeAdapter<Player> {
       lastDailyCompletion: fields[14] as DateTime?,
       unlockedTitles: (fields[15] as List?)?.cast<String>(),
       stats: fields[16] as PlayerStats?,
+      profileImagePath: fields[17] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Player obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -74,7 +75,9 @@ class PlayerAdapter extends TypeAdapter<Player> {
       ..writeByte(15)
       ..write(obj.unlockedTitles)
       ..writeByte(16)
-      ..write(obj.stats);
+      ..write(obj.stats)
+      ..writeByte(17)
+      ..write(obj.profileImagePath);
   }
 
   @override
