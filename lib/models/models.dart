@@ -8,3 +8,4 @@ export 'shadow.dart';
 export 'shop_item.dart';
 export 'nutrition_entry.dart';
 export 'nutrition_goals.dart';
+export 'saved_meal.dart';

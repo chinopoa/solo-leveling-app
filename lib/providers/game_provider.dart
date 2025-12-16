@@ -17,6 +17,7 @@ class GameProvider extends ChangeNotifier {
   late Box<DailyQuestProgress> _dailyProgressBox;
   late Box<NutritionEntry> _nutritionEntryBox;
   late Box<NutritionGoals> _nutritionGoalsBox;
+  late Box<SavedMeal> _savedMealBox;
 
   Player? _player;
   List<Quest> _quests = [];
@@ -31,6 +32,9 @@ class GameProvider extends ChangeNotifier {
   // Nutrition tracking
   List<NutritionEntry> _nutritionEntries = [];
   NutritionGoals? _nutritionGoals;
+
+  // Saved meals
+  List<SavedMeal> _savedMeals = [];
 
   // Level up state
   bool _showLevelUp = false;
@@ -116,6 +120,7 @@ class GameProvider extends ChangeNotifier {
   int get levelUpNewLevel => _levelUpNewLevel;
   int get levelUpPointsGained => _levelUpPointsGained;
   bool get autoBackupEnabled => _autoBackupEnabled;
+  List<SavedMeal> get savedMeals => _savedMeals;
 
   // Time until daily reset
   Duration get timeUntilReset {
@@ -144,6 +149,7 @@ class GameProvider extends ChangeNotifier {
     _dailyProgressBox = await Hive.openBox<DailyQuestProgress>('dailyProgress');
     _nutritionEntryBox = await Hive.openBox<NutritionEntry>('nutritionEntries');
     _nutritionGoalsBox = await Hive.openBox<NutritionGoals>('nutritionGoals');
+    _savedMealBox = await Hive.openBox<SavedMeal>('savedMeals');
 
     // Load auto-backup setting
     final prefs = await SharedPreferences.getInstance();
@@ -198,6 +204,9 @@ class GameProvider extends ChangeNotifier {
 
     // Load nutrition data
     await _loadNutritionData();
+
+    // Load saved meals
+    _savedMeals = _savedMealBox.values.toList();
 
     notifyListeners();
   }
@@ -651,6 +660,70 @@ class GameProvider extends ChangeNotifier {
       _nutritionEntries.remove(entry);
     }
     notifyListeners();
+  }
+
+  // ==================== SAVED MEALS ====================
+
+  // Add a new saved meal
+  Future<void> addSavedMeal(SavedMeal meal) async {
+    await _savedMealBox.put(meal.id, meal);
+    _savedMeals.add(meal);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  // Delete a saved meal
+  Future<void> deleteSavedMeal(String mealId) async {
+    await _savedMealBox.delete(mealId);
+    _savedMeals.removeWhere((m) => m.id == mealId);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  // Add entries from a saved meal to today's log
+  Future<void> addEntriesFromSavedMeal(SavedMeal meal, MealType mealType) async {
+    for (final item in meal.items) {
+      final entry = NutritionEntry(
+        id: '${DateTime.now().millisecondsSinceEpoch}_${item.name.hashCode}',
+        date: NutritionEntry.getTodayKey(),
+        productName: item.name,
+        barcode: item.barcode,
+        servingSize: item.servingSize,
+        servingsConsumed: item.servings,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        fiber: item.fiber,
+        sugar: item.sugar,
+        sodium: item.sodium,
+        mealType: mealType,
+      );
+      await addNutritionEntry(entry);
+    }
+  }
+
+  // Create a saved meal from existing nutrition entries
+  SavedMeal createSavedMealFromEntries(String name, List<NutritionEntry> entries) {
+    final items = entries.map((e) => SavedMealItem(
+      name: e.productName,
+      servingSize: e.servingSize,
+      servings: e.servingsConsumed,
+      calories: e.calories,
+      protein: e.protein,
+      carbs: e.carbs,
+      fat: e.fat,
+      fiber: e.fiber,
+      sugar: e.sugar,
+      sodium: e.sodium,
+      barcode: e.barcode,
+    )).toList();
+
+    return SavedMeal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      items: items,
+    );
   }
 
   // ==================== RESET METHODS ====================

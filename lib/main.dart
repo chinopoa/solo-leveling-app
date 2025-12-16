@@ -49,6 +49,10 @@ void _registerAdapters() {
   Hive.registerAdapter(NutritionEntryAdapter());
   Hive.registerAdapter(NutritionGoalsAdapter());
   Hive.registerAdapter(MealTypeAdapter());
+
+  // 5. Saved Meals
+  Hive.registerAdapter(SavedMealAdapter());
+  Hive.registerAdapter(SavedMealItemAdapter());
 }
 
 class SoloLevelingApp extends StatelessWidget {

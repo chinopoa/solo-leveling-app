@@ -7,6 +7,7 @@ import '../widgets/widgets.dart';
 import 'barcode_scanner_screen.dart';
 import 'manual_entry_screen.dart';
 import 'nutrition_goals_screen.dart';
+import 'saved_meals_screen.dart';
 
 class NutritionScreen extends StatefulWidget {
   const NutritionScreen({super.key});
@@ -709,6 +710,25 @@ class _NutritionScreenState extends State<NutritionScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Saved meals button
+        FloatingActionButton.small(
+          heroTag: 'saved',
+          backgroundColor: SoloLevelingTheme.backgroundCard,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SavedMealsScreen(),
+              ),
+            );
+          },
+          child: const Icon(
+            Icons.restaurant_menu,
+            color: SoloLevelingTheme.textMuted,
+            size: 20,
+          ),
+        ),
+        const SizedBox(height: 8),
         // Manual entry button
         FloatingActionButton.small(
           heroTag: 'manual',
