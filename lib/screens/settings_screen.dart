@@ -59,9 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Profile Picture Section
+              // Player Profile Section
               SystemWindow(
-                title: 'PROFILE PICTURE',
+                title: 'PLAYER PROFILE',
                 child: _buildProfileSection(context, game),
               ),
               const SizedBox(height: 16),
@@ -438,78 +438,163 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final player = game.player;
     final hasProfileImage = player?.profileImagePath != null;
 
-    return Row(
+    return Column(
       children: [
-        // Profile picture preview
-        Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: SoloLevelingTheme.primaryCyan,
-              width: 2,
+        // Profile picture row
+        Row(
+          children: [
+            // Profile picture preview
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: SoloLevelingTheme.primaryCyan,
+                  width: 2,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: hasProfileImage
+                    ? Image.file(
+                        File(player!.profileImagePath!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildProfilePlaceholder(),
+                      )
+                    : _buildProfilePlaceholder(),
+              ),
             ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: hasProfileImage
-                ? Image.file(
-                    File(player!.profileImagePath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildProfilePlaceholder(),
-                  )
-                : _buildProfilePlaceholder(),
-          ),
+            const SizedBox(width: 16),
+            // Change button
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Profile Picture',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _pickProfileImage(context, game),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
+                        border: Border.all(color: SoloLevelingTheme.primaryCyan),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.camera_alt,
+                            color: SoloLevelingTheme.primaryCyan,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            hasProfileImage ? 'CHANGE' : 'SET PICTURE',
+                            style: const TextStyle(
+                              color: SoloLevelingTheme.primaryCyan,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        // Change button
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                hasProfileImage ? 'Current profile picture' : 'No profile picture set',
-                style: TextStyle(
-                  color: SoloLevelingTheme.textSecondary,
-                  fontSize: 12,
+        const SizedBox(height: 16),
+        // Name change row
+        Row(
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: SoloLevelingTheme.primaryCyan.withOpacity(0.5),
+                  width: 2,
                 ),
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () => _pickProfileImage(context, game),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
-                    border: Border.all(color: SoloLevelingTheme.primaryCyan),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.camera_alt,
-                        color: SoloLevelingTheme.primaryCyan,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        hasProfileImage ? 'CHANGE PICTURE' : 'SET PICTURE',
-                        style: const TextStyle(
-                          color: SoloLevelingTheme.primaryCyan,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
+              child: const Center(
+                child: Icon(
+                  Icons.badge,
+                  color: SoloLevelingTheme.primaryCyan,
+                  size: 32,
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hunter Name',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    player?.name ?? 'Unknown',
+                    style: const TextStyle(
+                      color: SoloLevelingTheme.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showNameChangeDialog(context, game),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
+                        border: Border.all(color: SoloLevelingTheme.primaryCyan),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.edit,
+                            color: SoloLevelingTheme.primaryCyan,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'CHANGE NAME',
+                            style: TextStyle(
+                              color: SoloLevelingTheme.primaryCyan,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -568,6 +653,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (image != null) {
       await game.updateProfileImage(image.path);
+    }
+  }
+
+  Future<void> _showNameChangeDialog(BuildContext context, GameProvider game) async {
+    final controller = TextEditingController(text: game.player?.name ?? '');
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text(
+          'Change Hunter Name',
+          style: TextStyle(color: SoloLevelingTheme.primaryCyan),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Enter new name',
+            hintStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: SoloLevelingTheme.primaryCyan.withOpacity(0.5)),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderSide: BorderSide(color: SoloLevelingTheme.primaryCyan),
+            ),
+          ),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text(
+              'SAVE',
+              style: TextStyle(color: SoloLevelingTheme.primaryCyan),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (newName != null && newName.trim().isNotEmpty) {
+      await game.updatePlayerName(newName);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hunter name updated!')),
+        );
+      }
     }
   }
 }

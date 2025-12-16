@@ -270,6 +270,14 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Update player name
+  Future<void> updatePlayerName(String newName) async {
+    if (_player == null || newName.trim().isEmpty) return;
+    _player!.name = newName.trim();
+    await _player!.save();
+    notifyListeners();
+  }
+
   // Quest management
   Future<void> addQuest(Quest quest) async {
     await _questBox.put(quest.id, quest);
