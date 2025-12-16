@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
 import '../widgets/widgets.dart';
@@ -142,6 +144,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Data Backup Section
+              SystemWindow(
+                title: 'DATA BACKUP',
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
+                        border: Border.all(
+                          color: SoloLevelingTheme.primaryCyan.withOpacity(0.3),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.cloud_upload,
+                            color: SoloLevelingTheme.primaryCyan,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Export your data to keep a backup. Import to restore after reinstalling.',
+                              style: TextStyle(
+                                color: SoloLevelingTheme.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _BackupButton(
+                            label: 'EXPORT DATA',
+                            icon: Icons.upload_file,
+                            onTap: () => _exportData(context, game),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _BackupButton(
+                            label: 'IMPORT DATA',
+                            icon: Icons.download,
+                            onTap: () => _importData(context, game),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Reset Data Section
               SystemWindow(
                 title: 'DANGER ZONE',
@@ -212,6 +273,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _exportData(BuildContext context, GameProvider game) async {
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Exporting data...')),
+      );
+
+      // Export to file
+      final filePath = await game.exportToFile();
+
+      // Share the file
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        subject: 'Solo Leveling Backup',
+        text: 'My Solo Leveling app backup',
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data exported successfully!')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importData(BuildContext context, GameProvider game) async {
+    try {
+      // Pick a file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return; // User cancelled
+      }
+
+      final filePath = result.files.single.path;
+      if (filePath == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read file')),
+          );
+        }
+        return;
+      }
+
+      // Show confirmation dialog
+      if (context.mounted) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: SoloLevelingTheme.backgroundCard,
+            title: const Text(
+              'Import Data?',
+              style: TextStyle(color: SoloLevelingTheme.primaryCyan),
+            ),
+            content: const Text(
+              'This will replace ALL your current data with the backup. This cannot be undone!',
+              style: TextStyle(color: SoloLevelingTheme.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('CANCEL'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'IMPORT',
+                  style: TextStyle(color: SoloLevelingTheme.primaryCyan),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed != true) return;
+      }
+
+      // Import the data
+      final success = await game.importFromFile(filePath);
+
+      if (context.mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Data imported successfully!')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Import failed - invalid backup file')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import failed: $e')),
+        );
+      }
+    }
   }
 
   void _showResetDialog(
@@ -465,6 +635,53 @@ class _DangerButton extends StatelessWidget {
               letterSpacing: 0.5,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _BackupButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
+          border: Border.all(color: SoloLevelingTheme.primaryCyan.withOpacity(0.5)),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: SoloLevelingTheme.primaryCyan,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: SoloLevelingTheme.primaryCyan,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
       ),
     );

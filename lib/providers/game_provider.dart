@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 
 class GameProvider extends ChangeNotifier {
@@ -549,5 +552,402 @@ class GameProvider extends ChangeNotifier {
 
     // Reload all data
     await _loadData();
+  }
+
+  // ==================== BACKUP & RESTORE ====================
+
+  /// Export all data to JSON string
+  Future<String> exportData() async {
+    final data = {
+      'version': 1,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'player': _player != null ? _playerToJson(_player!) : null,
+      'quests': _quests.map((q) => _questToJson(q)).toList(),
+      'dungeons': _dungeons.map((d) => _dungeonToJson(d)).toList(),
+      'shadows': _shadows.map((s) => _shadowToJson(s)).toList(),
+      'shopItems': _shopItems.where((i) => i.isUserDefined).map((i) => _shopItemToJson(i)).toList(),
+      'inventory': _inventory != null ? _inventoryToJson(_inventory!) : null,
+      'dailyConfigs': _dailyConfigs.map((c) => _dailyConfigToJson(c)).toList(),
+      'dailyProgress': _dailyProgressBox.values.map((p) => _dailyProgressToJson(p)).toList(),
+      'nutritionEntries': _nutritionEntries.map((e) => _nutritionEntryToJson(e)).toList(),
+      'nutritionGoals': _nutritionGoals != null ? _nutritionGoalsToJson(_nutritionGoals!) : null,
+    };
+    return jsonEncode(data);
+  }
+
+  /// Export data to a file and return the file path
+  Future<String> exportToFile() async {
+    final jsonData = await exportData();
+    final directory = await getApplicationDocumentsDirectory();
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final file = File('${directory.path}/solo_leveling_backup_$timestamp.json');
+    await file.writeAsString(jsonData);
+    return file.path;
+  }
+
+  /// Import data from JSON string
+  Future<bool> importData(String jsonString) async {
+    try {
+      final data = jsonDecode(jsonString) as Map<String, dynamic>;
+
+      // Clear existing data first
+      await _playerBox.clear();
+      await _questBox.clear();
+      await _dungeonBox.clear();
+      await _shadowBox.clear();
+      await _inventoryBox.clear();
+      await _dailyProgressBox.clear();
+      await _nutritionEntryBox.clear();
+      await _nutritionGoalsBox.clear();
+
+      // Reset shop to defaults, then add custom items
+      await _shopItemBox.clear();
+      for (final item in ShopItem.getDefaultItems()) {
+        await _shopItemBox.put(item.id, item);
+      }
+
+      // Restore player
+      if (data['player'] != null) {
+        final player = _playerFromJson(data['player']);
+        await _playerBox.add(player);
+      }
+
+      // Restore quests
+      if (data['quests'] != null) {
+        for (final q in data['quests']) {
+          final quest = _questFromJson(q);
+          await _questBox.put(quest.id, quest);
+        }
+      }
+
+      // Restore dungeons
+      if (data['dungeons'] != null) {
+        for (final d in data['dungeons']) {
+          final dungeon = _dungeonFromJson(d);
+          await _dungeonBox.put(dungeon.id, dungeon);
+        }
+      }
+
+      // Restore shadows
+      if (data['shadows'] != null) {
+        for (final s in data['shadows']) {
+          final shadow = _shadowFromJson(s);
+          await _shadowBox.put(shadow.id, shadow);
+        }
+      }
+
+      // Restore custom shop items
+      if (data['shopItems'] != null) {
+        for (final i in data['shopItems']) {
+          final item = _shopItemFromJson(i);
+          await _shopItemBox.put(item.id, item);
+        }
+      }
+
+      // Restore inventory
+      if (data['inventory'] != null) {
+        final inventory = _inventoryFromJson(data['inventory']);
+        await _inventoryBox.add(inventory);
+      }
+
+      // Restore daily configs
+      await _dailyConfigBox.clear();
+      if (data['dailyConfigs'] != null) {
+        for (final c in data['dailyConfigs']) {
+          final config = _dailyConfigFromJson(c);
+          await _dailyConfigBox.put(config.id, config);
+        }
+      } else {
+        for (final config in DailyQuestConfig.getDefaults()) {
+          await _dailyConfigBox.put(config.id, config);
+        }
+      }
+
+      // Restore daily progress
+      if (data['dailyProgress'] != null) {
+        for (final p in data['dailyProgress']) {
+          final progress = _dailyProgressFromJson(p);
+          await _dailyProgressBox.put(progress.date, progress);
+        }
+      }
+
+      // Restore nutrition entries
+      if (data['nutritionEntries'] != null) {
+        for (final e in data['nutritionEntries']) {
+          final entry = _nutritionEntryFromJson(e);
+          await _nutritionEntryBox.put(entry.id, entry);
+        }
+      }
+
+      // Restore nutrition goals
+      if (data['nutritionGoals'] != null) {
+        final goals = _nutritionGoalsFromJson(data['nutritionGoals']);
+        await _nutritionGoalsBox.put('goals', goals);
+      }
+
+      // Reload all data
+      await _loadData();
+      return true;
+    } catch (e) {
+      debugPrint('Import error: $e');
+      return false;
+    }
+  }
+
+  /// Import data from a file
+  Future<bool> importFromFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      final jsonString = await file.readAsString();
+      return await importData(jsonString);
+    } catch (e) {
+      debugPrint('Import file error: $e');
+      return false;
+    }
+  }
+
+  // JSON serialization helpers - using existing toJson/fromJson where available
+  Map<String, dynamic> _playerToJson(Player p) => p.toJson();
+
+  Player _playerFromJson(Map<String, dynamic> j) => Player.fromJson(j);
+
+  Map<String, dynamic> _questToJson(Quest q) => {
+    'id': q.id,
+    'title': q.title,
+    'description': q.description,
+    'xpReward': q.xpReward,
+    'goldReward': q.goldReward,
+    'questType': q.questType,
+    'difficulty': q.difficulty,
+    'status': q.status,
+    'currentCount': q.currentCount,
+    'targetCount': q.targetCount,
+    'statBonus': q.statBonus,
+    'statBonusAmount': q.statBonusAmount,
+    'createdAt': q.createdAt.toIso8601String(),
+    'deadline': q.deadline?.toIso8601String(),
+    'completedAt': q.completedAt?.toIso8601String(),
+    'parentDungeonId': q.parentDungeonId,
+    'isRepeatable': q.isRepeatable,
+  };
+
+  Quest _questFromJson(Map<String, dynamic> j) {
+    return Quest(
+      id: j['id'],
+      title: j['title'] ?? '',
+      description: j['description'] ?? '',
+      xpReward: j['xpReward'] ?? 0,
+      goldReward: j['goldReward'] ?? 0,
+      questType: j['questType'] ?? 'normal',
+      difficulty: j['difficulty'] ?? 'normal',
+      status: j['status'] ?? 'active',
+      currentCount: j['currentCount'] ?? 0,
+      targetCount: j['targetCount'] ?? 1,
+      statBonus: j['statBonus'],
+      statBonusAmount: j['statBonusAmount'] ?? 0,
+      createdAt: j['createdAt'] != null ? DateTime.parse(j['createdAt']) : null,
+      deadline: j['deadline'] != null ? DateTime.parse(j['deadline']) : null,
+      completedAt: j['completedAt'] != null ? DateTime.parse(j['completedAt']) : null,
+      parentDungeonId: j['parentDungeonId'],
+      isRepeatable: j['isRepeatable'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> _dungeonToJson(Dungeon d) => {
+    'id': d.id,
+    'name': d.name,
+    'description': d.description,
+    'rank': d.rank,
+    'isCleared': d.isCleared,
+    'createdAt': d.createdAt.toIso8601String(),
+    'clearedAt': d.clearedAt?.toIso8601String(),
+    'questIds': d.questIds,
+    'bossQuestId': d.bossQuestId,
+    'totalXpReward': d.totalXpReward,
+    'totalGoldReward': d.totalGoldReward,
+    'rewardItemId': d.rewardItemId,
+  };
+
+  Dungeon _dungeonFromJson(Map<String, dynamic> j) {
+    return Dungeon(
+      id: j['id'],
+      name: j['name'] ?? '',
+      description: j['description'] ?? '',
+      rank: j['rank'] ?? 'E',
+      isCleared: j['isCleared'] ?? false,
+      createdAt: j['createdAt'] != null ? DateTime.parse(j['createdAt']) : null,
+      clearedAt: j['clearedAt'] != null ? DateTime.parse(j['clearedAt']) : null,
+      questIds: List<String>.from(j['questIds'] ?? []),
+      bossQuestId: j['bossQuestId'],
+      totalXpReward: j['totalXpReward'] ?? 0,
+      totalGoldReward: j['totalGoldReward'] ?? 0,
+      rewardItemId: j['rewardItemId'],
+    );
+  }
+
+  Map<String, dynamic> _shadowToJson(Shadow s) => {
+    'id': s.id,
+    'name': s.name,
+    'originalDungeonName': s.originalDungeonName,
+    'rank': s.rank,
+    'type': s.type,
+    'extractedAt': s.extractedAt.toIso8601String(),
+    'powerLevel': s.powerLevel,
+    'passiveBonus': s.passiveBonus,
+    'passiveBonusAmount': s.passiveBonusAmount,
+  };
+
+  Shadow _shadowFromJson(Map<String, dynamic> j) {
+    return Shadow(
+      id: j['id'],
+      name: j['name'] ?? '',
+      originalDungeonName: j['originalDungeonName'] ?? '',
+      rank: j['rank'] ?? 'soldier',
+      type: j['type'] ?? 'general',
+      extractedAt: j['extractedAt'] != null ? DateTime.parse(j['extractedAt']) : null,
+      powerLevel: j['powerLevel'] ?? 1,
+      passiveBonus: j['passiveBonus'],
+      passiveBonusAmount: j['passiveBonusAmount'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> _shopItemToJson(ShopItem i) => {
+    'id': i.id,
+    'name': i.name,
+    'description': i.description,
+    'price': i.price,
+    'category': i.category,
+    'effect': i.effect,
+    'isUserDefined': i.isUserDefined,
+    'iconEmoji': i.iconEmoji,
+  };
+
+  ShopItem _shopItemFromJson(Map<String, dynamic> j) {
+    return ShopItem(
+      name: j['name'] ?? '',
+      description: j['description'] ?? '',
+      price: j['price'] ?? 0,
+      category: j['category'] ?? 'reward',
+      effect: j['effect'],
+      isUserDefined: j['isUserDefined'] ?? true,
+      iconEmoji: j['iconEmoji'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> _inventoryToJson(Inventory i) => {
+    'items': i.items,
+  };
+
+  Inventory _inventoryFromJson(Map<String, dynamic> j) {
+    final inventory = Inventory();
+    final items = j['items'] as Map<String, dynamic>? ?? {};
+    items.forEach((key, value) {
+      inventory.items[key] = value as int;
+    });
+    return inventory;
+  }
+
+  Map<String, dynamic> _dailyConfigToJson(DailyQuestConfig c) => {
+    'id': c.id,
+    'title': c.title,
+    'targetCount': c.targetCount,
+    'statBonus': c.statBonus,
+    'isEnabled': c.isEnabled,
+    'order': c.order,
+  };
+
+  DailyQuestConfig _dailyConfigFromJson(Map<String, dynamic> j) {
+    return DailyQuestConfig(
+      id: j['id'] ?? '',
+      title: j['title'] ?? '',
+      targetCount: j['targetCount'] ?? 1,
+      statBonus: j['statBonus'] ?? 'STR',
+      isEnabled: j['isEnabled'] ?? true,
+      order: j['order'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> _dailyProgressToJson(DailyQuestProgress p) => {
+    'date': p.date,
+    'progress': p.progress,
+    'isCompleted': p.isCompleted,
+    'penaltyTriggered': p.penaltyTriggered,
+    'completedAt': p.completedAt?.toIso8601String(),
+  };
+
+  DailyQuestProgress _dailyProgressFromJson(Map<String, dynamic> j) {
+    return DailyQuestProgress(
+      date: j['date'] ?? '',
+      progress: Map<String, int>.from(j['progress'] ?? {}),
+      isCompleted: j['isCompleted'] ?? false,
+      penaltyTriggered: j['penaltyTriggered'] ?? false,
+      completedAt: j['completedAt'] != null ? DateTime.parse(j['completedAt']) : null,
+    );
+  }
+
+  Map<String, dynamic> _nutritionEntryToJson(NutritionEntry e) => {
+    'id': e.id,
+    'date': e.date,
+    'barcode': e.barcode,
+    'productName': e.productName,
+    'brand': e.brand,
+    'servingSize': e.servingSize,
+    'servingsConsumed': e.servingsConsumed,
+    'calories': e.calories,
+    'protein': e.protein,
+    'carbs': e.carbs,
+    'fat': e.fat,
+    'fiber': e.fiber,
+    'sugar': e.sugar,
+    'sodium': e.sodium,
+    'mealType': e.mealType.index,
+    'timestamp': e.timestamp.toIso8601String(),
+    'isManualEntry': e.isManualEntry,
+  };
+
+  NutritionEntry _nutritionEntryFromJson(Map<String, dynamic> j) {
+    return NutritionEntry(
+      id: j['id'] ?? '',
+      date: j['date'] ?? NutritionEntry.getTodayKey(),
+      barcode: j['barcode'],
+      productName: j['productName'] ?? '',
+      brand: j['brand'],
+      servingSize: (j['servingSize'] ?? 100).toDouble(),
+      servingsConsumed: (j['servingsConsumed'] ?? 1).toDouble(),
+      calories: (j['calories'] ?? 0).toDouble(),
+      protein: (j['protein'] ?? 0).toDouble(),
+      carbs: (j['carbs'] ?? 0).toDouble(),
+      fat: (j['fat'] ?? 0).toDouble(),
+      fiber: (j['fiber'] ?? 0).toDouble(),
+      sugar: (j['sugar'] ?? 0).toDouble(),
+      sodium: (j['sodium'] ?? 0).toDouble(),
+      mealType: MealType.values[j['mealType'] ?? 0],
+      timestamp: j['timestamp'] != null ? DateTime.parse(j['timestamp']) : null,
+      isManualEntry: j['isManualEntry'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> _nutritionGoalsToJson(NutritionGoals g) => {
+    'dailyCalories': g.dailyCalories,
+    'dailyProtein': g.dailyProtein,
+    'dailyCarbs': g.dailyCarbs,
+    'dailyFat': g.dailyFat,
+    'dailyFiber': g.dailyFiber,
+    'dailySugar': g.dailySugar,
+    'dailySodium': g.dailySodium,
+    'isEnabled': g.isEnabled,
+  };
+
+  NutritionGoals _nutritionGoalsFromJson(Map<String, dynamic> j) {
+    return NutritionGoals(
+      dailyCalories: j['dailyCalories'] ?? 2000,
+      dailyProtein: j['dailyProtein'] ?? 150,
+      dailyCarbs: j['dailyCarbs'] ?? 250,
+      dailyFat: j['dailyFat'] ?? 65,
+      dailyFiber: j['dailyFiber'] ?? 25,
+      dailySugar: j['dailySugar'] ?? 50,
+      dailySodium: j['dailySodium'] ?? 2300,
+      isEnabled: j['isEnabled'] ?? true,
+    );
   }
 }
