@@ -8,8 +8,61 @@ import 'barcode_scanner_screen.dart';
 import 'manual_entry_screen.dart';
 import 'nutrition_goals_screen.dart';
 
-class NutritionScreen extends StatelessWidget {
+class NutritionScreen extends StatefulWidget {
   const NutritionScreen({super.key});
+
+  @override
+  State<NutritionScreen> createState() => _NutritionScreenState();
+}
+
+class _NutritionScreenState extends State<NutritionScreen> {
+  DateTime _selectedDate = DateTime.now();
+
+  bool get _isToday {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
+
+  void _previousDay() {
+    setState(() {
+      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+    });
+  }
+
+  void _nextDay() {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    if (_selectedDate.isBefore(tomorrow.subtract(const Duration(days: 1)))) {
+      setState(() {
+        _selectedDate = _selectedDate.add(const Duration(days: 1));
+      });
+    }
+  }
+
+  void _goToToday() {
+    setState(() {
+      _selectedDate = DateTime.now();
+    });
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final selectedDay = DateTime(date.year, date.month, date.day);
+
+    if (selectedDay == today) {
+      return 'Today';
+    } else if (selectedDay == yesterday) {
+      return 'Yesterday';
+    } else {
+      final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,23 +101,28 @@ class NutritionScreen extends StatelessWidget {
       body: Consumer<GameProvider>(
         builder: (context, game, child) {
           final goals = game.nutritionGoals;
-          final entries = game.todayNutritionEntries;
+          final entries = game.getEntriesForDate(_selectedDate);
+          final nutrition = game.getNutritionForDate(_selectedDate);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Date navigation
+                _buildDateNavigator(),
+                const SizedBox(height: 16),
+
                 // Calorie summary
-                _buildCalorieSummary(game, goals),
+                _buildCalorieSummary(nutrition, goals),
                 const SizedBox(height: 16),
 
                 // Macro breakdown
-                _buildMacroBreakdown(game, goals),
+                _buildMacroBreakdown(nutrition, goals),
                 const SizedBox(height: 16),
 
                 // Detailed nutrients
-                _buildDetailedNutrients(game, goals),
+                _buildDetailedNutrients(nutrition, goals),
                 const SizedBox(height: 16),
 
                 // Food log by meal
@@ -75,19 +133,75 @@ class NutritionScreen extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: _buildAddFoodButton(context),
+      floatingActionButton: _isToday ? _buildAddFoodButton(context) : null,
     );
   }
 
-  Widget _buildCalorieSummary(GameProvider game, NutritionGoals goals) {
-    final consumed = game.todayCalories;
+  Widget _buildDateNavigator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: BoxDecoration(
+        color: SoloLevelingTheme.backgroundCard,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: SoloLevelingTheme.primaryCyan.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left, color: SoloLevelingTheme.primaryCyan),
+            onPressed: _previousDay,
+          ),
+          GestureDetector(
+            onTap: _isToday ? null : _goToToday,
+            child: Column(
+              children: [
+                Text(
+                  _formatDate(_selectedDate),
+                  style: TextStyle(
+                    color: _isToday
+                        ? SoloLevelingTheme.primaryCyan
+                        : SoloLevelingTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (!_isToday)
+                  Text(
+                    'Tap to go to today',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.chevron_right,
+              color: _isToday
+                  ? SoloLevelingTheme.textMuted.withOpacity(0.3)
+                  : SoloLevelingTheme.primaryCyan,
+            ),
+            onPressed: _isToday ? null : _nextDay,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalorieSummary(Map<String, double> nutrition, NutritionGoals goals) {
+    final consumed = nutrition['calories'] ?? 0;
     final target = goals.dailyCalories;
     final progress = (consumed / target).clamp(0.0, 1.0);
     final remaining = target - consumed;
     final isComplete = goals.isCalorieGoalMet(consumed);
 
     return SystemWindow(
-      title: 'DAILY CALORIES',
+      title: _isToday ? 'DAILY CALORIES' : 'CALORIES',
       child: Column(
         children: [
           Row(
@@ -166,7 +280,7 @@ class NutritionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMacroBreakdown(GameProvider game, NutritionGoals goals) {
+  Widget _buildMacroBreakdown(Map<String, double> nutrition, NutritionGoals goals) {
     return SystemWindow(
       title: 'MACRONUTRIENTS',
       child: Row(
@@ -174,7 +288,7 @@ class NutritionScreen extends StatelessWidget {
           Expanded(
             child: _buildMacroItem(
               'PROTEIN',
-              game.todayProtein,
+              nutrition['protein'] ?? 0,
               goals.dailyProtein.toDouble(),
               'g',
               SoloLevelingTheme.hpRed,
@@ -184,7 +298,7 @@ class NutritionScreen extends StatelessWidget {
           Expanded(
             child: _buildMacroItem(
               'CARBS',
-              game.todayCarbs,
+              nutrition['carbs'] ?? 0,
               goals.dailyCarbs.toDouble(),
               'g',
               SoloLevelingTheme.mpBlue,
@@ -194,7 +308,7 @@ class NutritionScreen extends StatelessWidget {
           Expanded(
             child: _buildMacroItem(
               'FAT',
-              game.todayFat,
+              nutrition['fat'] ?? 0,
               goals.dailyFat.toDouble(),
               'g',
               SoloLevelingTheme.primaryCyan,
@@ -268,14 +382,14 @@ class NutritionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailedNutrients(GameProvider game, NutritionGoals goals) {
+  Widget _buildDetailedNutrients(Map<String, double> nutrition, NutritionGoals goals) {
     return SystemWindow(
       title: 'OTHER NUTRIENTS',
       child: Column(
         children: [
           _buildNutrientRow(
             'Fiber',
-            game.todayFiber,
+            nutrition['fiber'] ?? 0,
             goals.dailyFiber.toDouble(),
             'g',
             SoloLevelingTheme.successGreen,
@@ -283,7 +397,7 @@ class NutritionScreen extends StatelessWidget {
           const SizedBox(height: 8),
           _buildNutrientRow(
             'Sugar',
-            game.todaySugar,
+            nutrition['sugar'] ?? 0,
             goals.dailySugar.toDouble(),
             'g',
             SoloLevelingTheme.xpGold,
@@ -292,7 +406,7 @@ class NutritionScreen extends StatelessWidget {
           const SizedBox(height: 8),
           _buildNutrientRow(
             'Sodium',
-            game.todaySodium,
+            nutrition['sodium'] ?? 0,
             goals.dailySodium.toDouble(),
             'mg',
             SoloLevelingTheme.textMuted,
@@ -371,9 +485,11 @@ class NutritionScreen extends StatelessWidget {
     GameProvider game,
     List<NutritionEntry> entries,
   ) {
+    final title = _isToday ? "TODAY'S FOOD LOG" : 'FOOD LOG';
+
     if (entries.isEmpty) {
       return SystemWindow(
-        title: 'TODAY\'S FOOD LOG',
+        title: title,
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -386,20 +502,22 @@ class NutritionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'No food logged yet',
+                  _isToday ? 'No food logged yet' : 'No food logged this day',
                   style: TextStyle(
                     color: SoloLevelingTheme.textMuted,
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap + to scan a barcode or add food manually',
-                  style: TextStyle(
-                    color: SoloLevelingTheme.textMuted.withOpacity(0.7),
-                    fontSize: 12,
+                if (_isToday) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap + to scan a barcode or add food manually',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textMuted.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -408,10 +526,10 @@ class NutritionScreen extends StatelessWidget {
     }
 
     return SystemWindow(
-      title: 'TODAY\'S FOOD LOG',
+      title: title,
       child: Column(
         children: MealType.values.map((mealType) {
-          final mealEntries = game.getEntriesByMealType(mealType);
+          final mealEntries = entries.where((e) => e.mealType == mealType).toList();
           if (mealEntries.isEmpty) return const SizedBox.shrink();
 
           return _buildMealSection(context, game, mealType, mealEntries);
@@ -478,6 +596,22 @@ class NutritionScreen extends StatelessWidget {
     GameProvider game,
     NutritionEntry entry,
   ) {
+    // Only allow deletion for today's entries
+    if (!_isToday) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: SoloLevelingTheme.backgroundElevated,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: SoloLevelingTheme.primaryCyan.withOpacity(0.2),
+          ),
+        ),
+        child: _buildFoodItemContent(entry),
+      );
+    }
+
     return Dismissible(
       key: Key(entry.id),
       direction: DismissDirection.endToStart,
@@ -513,57 +647,61 @@ class NutritionScreen extends StatelessWidget {
             color: SoloLevelingTheme.primaryCyan.withOpacity(0.2),
           ),
         ),
-        child: Row(
+        child: _buildFoodItemContent(entry),
+      ),
+    );
+  }
+
+  Widget _buildFoodItemContent(NutritionEntry entry) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.productName,
+                style: const TextStyle(
+                  color: SoloLevelingTheme.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${entry.servingsConsumed}x ${entry.servingSize.toStringAsFixed(0)}g',
+                style: TextStyle(
+                  color: SoloLevelingTheme.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.productName,
-                    style: const TextStyle(
-                      color: SoloLevelingTheme.textPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${entry.servingsConsumed}x ${entry.servingSize.toStringAsFixed(0)}g',
-                    style: TextStyle(
-                      color: SoloLevelingTheme.textMuted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+            Text(
+              '${entry.totalCalories.toStringAsFixed(0)} kcal',
+              style: const TextStyle(
+                color: SoloLevelingTheme.xpGold,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${entry.totalCalories.toStringAsFixed(0)} kcal',
-                  style: const TextStyle(
-                    color: SoloLevelingTheme.xpGold,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'P:${entry.totalProtein.toStringAsFixed(0)} C:${entry.totalCarbs.toStringAsFixed(0)} F:${entry.totalFat.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: SoloLevelingTheme.textMuted,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 2),
+            Text(
+              'P:${entry.totalProtein.toStringAsFixed(0)} C:${entry.totalCarbs.toStringAsFixed(0)} F:${entry.totalFat.toStringAsFixed(0)}',
+              style: TextStyle(
+                color: SoloLevelingTheme.textMuted,
+                fontSize: 10,
+              ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 

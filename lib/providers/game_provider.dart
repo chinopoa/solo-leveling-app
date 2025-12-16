@@ -87,6 +87,31 @@ class GameProvider extends ChangeNotifier {
     return todayNutritionEntries.where((e) => e.mealType == mealType).toList();
   }
 
+  // Get entries for a specific date
+  List<NutritionEntry> getEntriesForDate(DateTime date) {
+    final dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return _nutritionEntries.where((e) => e.date == dateKey).toList();
+  }
+
+  // Get entries by meal type for a specific date
+  List<NutritionEntry> getEntriesByMealTypeForDate(MealType mealType, DateTime date) {
+    return getEntriesForDate(date).where((e) => e.mealType == mealType).toList();
+  }
+
+  // Get nutrition totals for a specific date
+  Map<String, double> getNutritionForDate(DateTime date) {
+    final entries = getEntriesForDate(date);
+    return {
+      'calories': entries.fold(0.0, (sum, e) => sum + e.totalCalories),
+      'protein': entries.fold(0.0, (sum, e) => sum + e.totalProtein),
+      'carbs': entries.fold(0.0, (sum, e) => sum + e.totalCarbs),
+      'fat': entries.fold(0.0, (sum, e) => sum + e.totalFat),
+      'fiber': entries.fold(0.0, (sum, e) => sum + e.totalFiber),
+      'sugar': entries.fold(0.0, (sum, e) => sum + e.totalSugar),
+      'sodium': entries.fold(0.0, (sum, e) => sum + e.totalSodium),
+    };
+  }
+
   bool get showLevelUp => _showLevelUp;
   int get levelUpNewLevel => _levelUpNewLevel;
   int get levelUpPointsGained => _levelUpPointsGained;
