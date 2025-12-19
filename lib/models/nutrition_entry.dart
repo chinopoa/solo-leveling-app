@@ -148,10 +148,11 @@ class NutritionEntry extends HiveObject {
     double sodium = 0,
     required MealType mealType,
     double servingsConsumed = 1.0,
+    DateTime? date,
   }) {
     return NutritionEntry(
       id: id,
-      date: getTodayKey(),
+      date: date != null ? getDateKey(date) : getTodayKey(),
       barcode: barcode,
       productName: productName,
       brand: brand,
@@ -169,6 +170,11 @@ class NutritionEntry extends HiveObject {
     );
   }
 
+  // Get date key from DateTime
+  static String getDateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
   // Create manual entry
   factory NutritionEntry.manual({
     required String id,
@@ -183,10 +189,11 @@ class NutritionEntry extends HiveObject {
     double sodium = 0,
     required MealType mealType,
     double servingsConsumed = 1.0,
+    DateTime? date,
   }) {
     return NutritionEntry(
       id: id,
-      date: getTodayKey(),
+      date: date != null ? getDateKey(date) : getTodayKey(),
       productName: productName,
       servingSize: servingSize,
       servingsConsumed: servingsConsumed,

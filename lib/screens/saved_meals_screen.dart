@@ -6,7 +6,9 @@ import '../theme/solo_leveling_theme.dart';
 import '../widgets/widgets.dart';
 
 class SavedMealsScreen extends StatelessWidget {
-  const SavedMealsScreen({super.key});
+  final DateTime? date;
+
+  const SavedMealsScreen({super.key, this.date});
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +75,7 @@ class SavedMealsScreen extends StatelessWidget {
             itemCount: savedMeals.length,
             itemBuilder: (context, index) {
               final meal = savedMeals[index];
-              return _SavedMealCard(meal: meal);
+              return _SavedMealCard(meal: meal, date: date);
             },
           );
         },
@@ -101,8 +103,9 @@ class SavedMealsScreen extends StatelessWidget {
 
 class _SavedMealCard extends StatelessWidget {
   final SavedMeal meal;
+  final DateTime? date;
 
-  const _SavedMealCard({required this.meal});
+  const _SavedMealCard({required this.meal, this.date});
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +285,7 @@ class _SavedMealCard extends StatelessWidget {
                 style: const TextStyle(color: SoloLevelingTheme.textPrimary),
               ),
               onTap: () {
-                context.read<GameProvider>().addEntriesFromSavedMeal(meal, mealType);
+                context.read<GameProvider>().addEntriesFromSavedMeal(meal, mealType, date: date);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import '../services/notification_service.dart';
 
 class GameProvider extends ChangeNotifier {
   late Box<Player> _playerBox;
@@ -50,7 +51,9 @@ class GameProvider extends ChangeNotifier {
   Player? get player => _player;
   List<Quest> get quests => _quests;
   List<Quest> get activeQuests =>
-      _quests.where((q) => q.isActive && q.type != QuestType.daily).toList();
+      _quests.where((q) => q.isAvailable && q.type != QuestType.daily).toList();
+  List<Quest> get scheduledQuests =>
+      _quests.where((q) => q.isActive && q.isScheduledForFuture && q.type != QuestType.daily).toList();
   List<Quest> get completedQuests => _quests.where((q) => q.isCompleted).toList();
   List<Quest> get dailyQuests => _dailyQuests;
   List<Dungeon> get dungeons => _dungeons;
@@ -392,6 +395,11 @@ class GameProvider extends ChangeNotifier {
     await _questBox.put(quest.id, quest);
     _quests.add(quest);
     notifyListeners();
+
+    // Schedule notification if quest has a scheduled date
+    if (quest.scheduledDate != null) {
+      NotificationService().scheduleQuestNotification(quest);
+    }
   }
 
   Future<void> completeQuest(Quest quest) async {
@@ -415,6 +423,18 @@ class GameProvider extends ChangeNotifier {
       _player?.addGold(quest.goldReward);
     }
     notifyListeners();
+  }
+
+  Future<void> deleteQuest(Quest quest) async {
+    // Cancel notification if it was scheduled
+    if (quest.scheduledDate != null) {
+      NotificationService().cancelQuestNotification(quest);
+    }
+
+    await _questBox.delete(quest.id);
+    _quests.removeWhere((q) => q.id == quest.id);
+    notifyListeners();
+    _triggerAutoBackup();
   }
 
   // Daily quest management
@@ -680,12 +700,13 @@ class GameProvider extends ChangeNotifier {
     _triggerAutoBackup();
   }
 
-  // Add entries from a saved meal to today's log
-  Future<void> addEntriesFromSavedMeal(SavedMeal meal, MealType mealType) async {
+  // Add entries from a saved meal to the log
+  Future<void> addEntriesFromSavedMeal(SavedMeal meal, MealType mealType, {DateTime? date}) async {
+    final dateKey = date != null ? NutritionEntry.getDateKey(date) : NutritionEntry.getTodayKey();
     for (final item in meal.items) {
       final entry = NutritionEntry(
         id: '${DateTime.now().millisecondsSinceEpoch}_${item.name.hashCode}',
-        date: NutritionEntry.getTodayKey(),
+        date: dateKey,
         productName: item.name,
         barcode: item.barcode,
         servingSize: item.servingSize,

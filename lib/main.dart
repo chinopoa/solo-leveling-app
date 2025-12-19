@@ -8,6 +8,7 @@ import 'providers/game_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'models/models.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,9 @@ void main() async {
 
   // Register Hive adapters
   _registerAdapters();
+
+  // Initialize notification service
+  await NotificationService().initialize();
 
   runApp(const SoloLevelingApp());
 }

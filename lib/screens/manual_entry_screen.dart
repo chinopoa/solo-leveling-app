@@ -7,8 +7,9 @@ import '../theme/solo_leveling_theme.dart';
 
 class ManualEntryScreen extends StatefulWidget {
   final String? barcode;
+  final DateTime? date;
 
-  const ManualEntryScreen({super.key, this.barcode});
+  const ManualEntryScreen({super.key, this.barcode, this.date});
 
   @override
   State<ManualEntryScreen> createState() => _ManualEntryScreenState();
@@ -91,6 +92,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
       sugar: double.tryParse(_sugarController.text) ?? 0,
       sodium: double.tryParse(_sodiumController.text) ?? 0,
       mealType: _selectedMealType,
+      date: widget.date,
     );
 
     context.read<GameProvider>().addNutritionEntry(entry);
@@ -109,20 +111,46 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     );
   }
 
+  String _getAppBarSubtitle() {
+    if (widget.date == null) return '';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(widget.date!.year, widget.date!.month, widget.date!.day);
+    if (selectedDay == today) return '';
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (selectedDay == yesterday) return 'Yesterday';
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[widget.date!.month - 1]} ${widget.date!.day}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final subtitle = _getAppBarSubtitle();
     return Scaffold(
       backgroundColor: SoloLevelingTheme.backgroundDark,
       appBar: AppBar(
         backgroundColor: SoloLevelingTheme.backgroundCard,
-        title: const Text(
-          'MANUAL ENTRY',
-          style: TextStyle(
-            color: SoloLevelingTheme.primaryCyan,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'MANUAL ENTRY',
+              style: TextStyle(
+                color: SoloLevelingTheme.primaryCyan,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+            if (subtitle.isNotEmpty)
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: SoloLevelingTheme.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+          ],
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: SoloLevelingTheme.textPrimary),

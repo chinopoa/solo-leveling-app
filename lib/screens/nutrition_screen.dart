@@ -134,7 +134,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
           );
         },
       ),
-      floatingActionButton: _isToday ? _buildAddFoodButton(context) : null,
+      floatingActionButton: _buildAddFoodButton(context),
     );
   }
 
@@ -509,16 +509,14 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     fontSize: 14,
                   ),
                 ),
-                if (_isToday) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap + to scan a barcode or add food manually',
-                    style: TextStyle(
-                      color: SoloLevelingTheme.textMuted.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap + to scan a barcode or add food manually',
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted.withOpacity(0.7),
+                    fontSize: 12,
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -597,22 +595,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
     GameProvider game,
     NutritionEntry entry,
   ) {
-    // Only allow deletion for today's entries
-    if (!_isToday) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: SoloLevelingTheme.backgroundElevated,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: SoloLevelingTheme.primaryCyan.withOpacity(0.2),
-          ),
-        ),
-        child: _buildFoodItemContent(entry),
-      );
-    }
-
     return Dismissible(
       key: Key(entry.id),
       direction: DismissDirection.endToStart,
@@ -718,7 +700,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const SavedMealsScreen(),
+                builder: (context) => SavedMealsScreen(date: _selectedDate),
               ),
             );
           },
@@ -737,7 +719,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const ManualEntryScreen(),
+                builder: (context) => ManualEntryScreen(date: _selectedDate),
               ),
             );
           },

@@ -62,6 +62,9 @@ class Quest extends HiveObject {
   @HiveField(16)
   String? parentDungeonId; // If this quest is part of a dungeon
 
+  @HiveField(17)
+  DateTime? scheduledDate; // Quest won't appear until this date
+
   Quest({
     String? id,
     required this.title,
@@ -80,6 +83,7 @@ class Quest extends HiveObject {
     this.targetCount = 1,
     this.currentCount = 0,
     this.parentDungeonId,
+    this.scheduledDate,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
@@ -101,6 +105,14 @@ class Quest extends HiveObject {
   bool get isCompleted => status == 'completed';
   bool get isFailed => status == 'failed';
   bool get isActive => status == 'active';
+  bool get isScheduledForFuture {
+    if (scheduledDate == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final scheduled = DateTime(scheduledDate!.year, scheduledDate!.month, scheduledDate!.day);
+    return scheduled.isAfter(today);
+  }
+  bool get isAvailable => isActive && !isScheduledForFuture;
   bool get isExpired {
     if (deadline == null) return false;
     return DateTime.now().isAfter(deadline!) && !isCompleted;
@@ -138,6 +150,7 @@ class Quest extends HiveObject {
     DateTime? deadline,
     int targetCount = 1,
     String? parentDungeonId,
+    DateTime? scheduledDate,
   }) {
     int xp;
     int gold;
@@ -190,6 +203,7 @@ class Quest extends HiveObject {
       targetCount: targetCount,
       isRepeatable: type == QuestType.daily,
       parentDungeonId: parentDungeonId,
+      scheduledDate: scheduledDate,
     );
   }
 }

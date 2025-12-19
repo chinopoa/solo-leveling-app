@@ -72,18 +72,26 @@ class _QuestsScreenState extends State<QuestsScreen>
   }
 }
 
-class _QuestsTab extends StatelessWidget {
+class _QuestsTab extends StatefulWidget {
   const _QuestsTab();
+
+  @override
+  State<_QuestsTab> createState() => _QuestsTabState();
+}
+
+class _QuestsTabState extends State<_QuestsTab> {
+  bool _showScheduled = false;
 
   @override
   Widget build(BuildContext context) {
     return Consumer<GameProvider>(
       builder: (context, game, child) {
         final quests = game.activeQuests;
+        final scheduledQuests = game.scheduledQuests;
 
         return Stack(
           children: [
-            if (quests.isEmpty)
+            if (quests.isEmpty && scheduledQuests.isEmpty)
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -114,19 +122,63 @@ class _QuestsTab extends StatelessWidget {
                 ),
               )
             else
-              ListView.builder(
+              ListView(
                 padding: const EdgeInsets.all(16),
-                itemCount: quests.length,
-                itemBuilder: (context, index) {
-                  final quest = quests[index];
-                  return QuestCard(
+                children: [
+                  // Active quests
+                  ...quests.map((quest) => QuestCard(
                     quest: quest,
                     onComplete: () => game.completeQuest(quest),
                     onIncrement: quest.targetCount > 1
                         ? () => game.incrementQuestProgress(quest)
                         : null,
-                  );
-                },
+                  )),
+                  // Scheduled quests section
+                  if (scheduledQuests.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: () => setState(() => _showScheduled = !_showScheduled),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: SoloLevelingTheme.backgroundCard,
+                          border: Border.all(
+                            color: SoloLevelingTheme.textMuted.withOpacity(0.3),
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              color: SoloLevelingTheme.textMuted,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'SCHEDULED QUESTS (${scheduledQuests.length})',
+                              style: const TextStyle(
+                                color: SoloLevelingTheme.textMuted,
+                                fontSize: 12,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              _showScheduled ? Icons.expand_less : Icons.expand_more,
+                              color: SoloLevelingTheme.textMuted,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_showScheduled) ...[
+                      const SizedBox(height: 8),
+                      ...scheduledQuests.map((quest) => _ScheduledQuestCard(quest: quest)),
+                    ],
+                  ],
+                  const SizedBox(height: 80), // Space for FAB
+                ],
               ),
             // FAB
             Positioned(
@@ -148,6 +200,18 @@ class _QuestsTab extends StatelessWidget {
     final descController = TextEditingController();
     String selectedStat = 'STR';
     QuestDifficulty selectedDifficulty = QuestDifficulty.normal;
+    bool scheduleQuest = false;
+    DateTime? scheduledDate;
+
+    String formatScheduledDate(DateTime date) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final diff = date.difference(today).inDays;
+      if (diff == 1) return 'Tomorrow';
+      if (diff <= 7) return 'In $diff days';
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    }
 
     showDialog(
       context: context,
@@ -263,6 +327,94 @@ class _QuestsTab extends StatelessWidget {
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 16),
+                // Schedule toggle
+                Row(
+                  children: [
+                    const Text(
+                      'SCHEDULE FOR LATER',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const Spacer(),
+                    Switch(
+                      value: scheduleQuest,
+                      onChanged: (v) {
+                        setState(() {
+                          scheduleQuest = v;
+                          if (!v) scheduledDate = null;
+                        });
+                      },
+                      activeColor: SoloLevelingTheme.primaryCyan,
+                    ),
+                  ],
+                ),
+                if (scheduleQuest) ...[
+                  const SizedBox(height: 8),
+                  // Quick date options
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _buildQuickDateChip('Tomorrow', DateTime.now().add(const Duration(days: 1)), scheduledDate, (d) => setState(() => scheduledDate = d)),
+                      _buildQuickDateChip('In 1 week', DateTime.now().add(const Duration(days: 7)), scheduledDate, (d) => setState(() => scheduledDate = d)),
+                      _buildQuickDateChip('In 2 weeks', DateTime.now().add(const Duration(days: 14)), scheduledDate, (d) => setState(() => scheduledDate = d)),
+                      _buildQuickDateChip('In 1 month', DateTime.now().add(const Duration(days: 30)), scheduledDate, (d) => setState(() => scheduledDate = d)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Custom date picker
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: scheduledDate ?? DateTime.now().add(const Duration(days: 1)),
+                        firstDate: DateTime.now().add(const Duration(days: 1)),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.dark(
+                                primary: SoloLevelingTheme.primaryCyan,
+                                surface: SoloLevelingTheme.backgroundCard,
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        setState(() => scheduledDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: SoloLevelingTheme.primaryCyan.withOpacity(0.5)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: SoloLevelingTheme.primaryCyan, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            scheduledDate != null
+                                ? formatScheduledDate(scheduledDate!)
+                                : 'Pick a date...',
+                            style: TextStyle(
+                              color: scheduledDate != null
+                                  ? SoloLevelingTheme.textPrimary
+                                  : SoloLevelingTheme.textMuted,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -280,6 +432,7 @@ class _QuestsTab extends StatelessWidget {
                     difficulty: selectedDifficulty,
                     type: QuestType.normal,
                     statBonus: selectedStat,
+                    scheduledDate: scheduleQuest ? scheduledDate : null,
                   );
                   game.addQuest(quest);
                   Navigator.pop(context);
@@ -288,6 +441,38 @@ class _QuestsTab extends StatelessWidget {
               child: const Text('CREATE'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickDateChip(String label, DateTime date, DateTime? selectedDate, Function(DateTime) onSelect) {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final normalizedSelected = selectedDate != null
+        ? DateTime(selectedDate.year, selectedDate.month, selectedDate.day)
+        : null;
+    final isSelected = normalizedSelected == normalizedDate;
+
+    return GestureDetector(
+      onTap: () => onSelect(normalizedDate),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? SoloLevelingTheme.primaryCyan.withOpacity(0.2) : null,
+          border: Border.all(
+            color: isSelected
+                ? SoloLevelingTheme.primaryCyan
+                : SoloLevelingTheme.textMuted.withOpacity(0.3),
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? SoloLevelingTheme.primaryCyan : SoloLevelingTheme.textMuted,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );
@@ -854,6 +1039,111 @@ class _DungeonQuestItem extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduledQuestCard extends StatelessWidget {
+  final Quest quest;
+
+  const _ScheduledQuestCard({required this.quest});
+
+  String _formatScheduledDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final scheduled = DateTime(date.year, date.month, date.day);
+    final diff = scheduled.difference(today).inDays;
+
+    if (diff == 1) return 'Tomorrow';
+    if (diff <= 7) return 'In $diff days';
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statColor = quest.statBonus != null
+        ? SoloLevelingTheme.getStatColor(quest.statBonus!)
+        : SoloLevelingTheme.textMuted;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: SoloLevelingTheme.backgroundCard.withOpacity(0.5),
+        border: Border.all(
+          color: SoloLevelingTheme.textMuted.withOpacity(0.2),
+        ),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          // Stat indicator
+          Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(
+              color: statColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Quest info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  quest.title,
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      color: SoloLevelingTheme.textMuted.withOpacity(0.7),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatScheduledDate(quest.scheduledDate!),
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textMuted.withOpacity(0.7),
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '+${quest.xpReward} XP',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.xpGold.withOpacity(0.7),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Delete button
+          IconButton(
+            icon: Icon(
+              Icons.delete_outline,
+              color: SoloLevelingTheme.hpRed.withOpacity(0.7),
+              size: 20,
+            ),
+            onPressed: () {
+              context.read<GameProvider>().deleteQuest(quest);
+            },
+          ),
         ],
       ),
     );

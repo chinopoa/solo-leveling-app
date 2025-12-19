@@ -34,13 +34,14 @@ class QuestAdapter extends TypeAdapter<Quest> {
       targetCount: fields[14] as int,
       currentCount: fields[15] as int,
       parentDungeonId: fields[16] as String?,
+      scheduledDate: fields[17] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Quest obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -74,7 +75,9 @@ class QuestAdapter extends TypeAdapter<Quest> {
       ..writeByte(15)
       ..write(obj.currentCount)
       ..writeByte(16)
-      ..write(obj.parentDungeonId);
+      ..write(obj.parentDungeonId)
+      ..writeByte(17)
+      ..write(obj.scheduledDate);
   }
 
   @override

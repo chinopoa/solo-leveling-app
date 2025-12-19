@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
 import '../widgets/widgets.dart';
+import '../services/notification_service.dart';
 import 'nutrition_goals_screen.dart';
 
 /// Settings screen - Configure quests and nutrition goals
@@ -150,6 +151,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+
+              // Notifications Section
+              SystemWindow(
+                title: 'NOTIFICATIONS',
+                child: _NotificationSettings(),
               ),
               const SizedBox(height: 16),
 
@@ -1850,6 +1858,337 @@ class _ResultItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NotificationSettings extends StatefulWidget {
+  @override
+  State<_NotificationSettings> createState() => _NotificationSettingsState();
+}
+
+class _NotificationSettingsState extends State<_NotificationSettings> {
+  final _notificationService = NotificationService();
+
+  bool _permissionsGranted = false;
+  bool _dailyQuestReminder = false;
+  bool _scheduledQuestNotifications = false;
+  bool _nutritionReminders = false;
+  TimeOfDay _dailyReminderTime = const TimeOfDay(hour: 9, minute: 0);
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final permissions = await _notificationService.areNotificationsEnabled();
+    final dailyQuest = await _notificationService.getDailyQuestReminderEnabled();
+    final scheduledQuest = await _notificationService.getScheduledQuestNotificationsEnabled();
+    final nutrition = await _notificationService.getNutritionReminderEnabled();
+    final time = await _notificationService.getDailyReminderTime();
+
+    if (mounted) {
+      setState(() {
+        _permissionsGranted = permissions;
+        _dailyQuestReminder = dailyQuest;
+        _scheduledQuestNotifications = scheduledQuest;
+        _nutritionReminders = nutrition;
+        _dailyReminderTime = time;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _requestPermissions() async {
+    final granted = await _notificationService.requestPermissions();
+    setState(() => _permissionsGranted = granted);
+
+    if (granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notifications enabled!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enable notifications in Settings')),
+      );
+    }
+  }
+
+  Future<void> _pickReminderTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _dailyReminderTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: SoloLevelingTheme.primaryCyan,
+              surface: SoloLevelingTheme.backgroundCard,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (time != null) {
+      setState(() => _dailyReminderTime = time);
+      await _notificationService.setDailyReminderTime(time);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(
+            color: SoloLevelingTheme.primaryCyan,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Enable notifications button (if not granted)
+        if (!_permissionsGranted) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: SoloLevelingTheme.primaryCyan.withOpacity(0.1),
+              border: Border.all(
+                color: SoloLevelingTheme.primaryCyan.withOpacity(0.3),
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.notifications_off,
+                      color: SoloLevelingTheme.primaryCyan,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Enable notifications to receive reminders',
+                        style: TextStyle(
+                          color: SoloLevelingTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _requestPermissions,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: SoloLevelingTheme.primaryCyan,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'ENABLE NOTIFICATIONS',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Daily Quest Reminder
+        _buildNotificationToggle(
+          icon: Icons.today,
+          title: 'Daily Quest Reminder',
+          subtitle: 'Get reminded to complete your daily quests',
+          value: _dailyQuestReminder,
+          onChanged: _permissionsGranted
+              ? (value) async {
+                  setState(() => _dailyQuestReminder = value);
+                  await _notificationService.setDailyQuestReminderEnabled(value);
+                }
+              : null,
+        ),
+
+        // Time picker for daily reminder
+        if (_dailyQuestReminder) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _pickReminderTime,
+            child: Container(
+              margin: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: SoloLevelingTheme.primaryCyan.withOpacity(0.3),
+                ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.access_time,
+                    color: SoloLevelingTheme.primaryCyan,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Remind at ${_dailyReminderTime.format(context)}',
+                    style: const TextStyle(
+                      color: SoloLevelingTheme.textPrimary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.edit,
+                    color: SoloLevelingTheme.textMuted,
+                    size: 14,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 12),
+
+        // Scheduled Quest Notifications
+        _buildNotificationToggle(
+          icon: Icons.schedule,
+          title: 'Scheduled Quest Alerts',
+          subtitle: 'Get notified when scheduled quests become active',
+          value: _scheduledQuestNotifications,
+          onChanged: _permissionsGranted
+              ? (value) async {
+                  setState(() => _scheduledQuestNotifications = value);
+                  await _notificationService.setScheduledQuestNotificationsEnabled(value);
+                }
+              : null,
+        ),
+
+        const SizedBox(height: 12),
+
+        // Nutrition Reminders
+        _buildNotificationToggle(
+          icon: Icons.restaurant,
+          title: 'Meal Logging Reminders',
+          subtitle: 'Reminders at breakfast, lunch & dinner time',
+          value: _nutritionReminders,
+          onChanged: _permissionsGranted
+              ? (value) async {
+                  setState(() => _nutritionReminders = value);
+                  await _notificationService.setNutritionReminderEnabled(value);
+                }
+              : null,
+        ),
+
+        // Test notification button (for debugging)
+        // const SizedBox(height: 16),
+        // GestureDetector(
+        //   onTap: () => _notificationService.showTestNotification(),
+        //   child: Container(
+        //     padding: const EdgeInsets.symmetric(vertical: 10),
+        //     decoration: BoxDecoration(
+        //       border: Border.all(color: SoloLevelingTheme.textMuted),
+        //       borderRadius: BorderRadius.circular(4),
+        //     ),
+        //     child: const Center(
+        //       child: Text(
+        //         'TEST NOTIFICATION',
+        //         style: TextStyle(
+        //           color: SoloLevelingTheme.textMuted,
+        //           fontSize: 11,
+        //         ),
+        //       ),
+        //     ),
+        //   ),
+        // ),
+      ],
+    );
+  }
+
+  Widget _buildNotificationToggle({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    final isEnabled = onChanged != null;
+    final color = isEnabled
+        ? (value ? SoloLevelingTheme.successGreen : SoloLevelingTheme.primaryCyan)
+        : SoloLevelingTheme.textMuted;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: value && isEnabled
+            ? SoloLevelingTheme.successGreen.withOpacity(0.1)
+            : SoloLevelingTheme.backgroundElevated,
+        border: Border.all(
+          color: value && isEnabled
+              ? SoloLevelingTheme.successGreen.withOpacity(0.5)
+              : SoloLevelingTheme.primaryCyan.withOpacity(0.2),
+        ),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: isEnabled
+                        ? SoloLevelingTheme.textPrimary
+                        : SoloLevelingTheme.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: SoloLevelingTheme.successGreen,
+          ),
+        ],
+      ),
     );
   }
 }
