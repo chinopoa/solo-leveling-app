@@ -39,13 +39,13 @@ void _registerAdapters() {
   // 1. Player & Stats
   Hive.registerAdapter(PlayerAdapter());
   Hive.registerAdapter(PlayerStatsAdapter());
-  
+
   // 2. Quests & Daily
   Hive.registerAdapter(QuestAdapter());
   Hive.registerAdapter(DailyQuestConfigAdapter());
   Hive.registerAdapter(DailyQuestProgressAdapter());
 
-  // 3. Shop & Inventory
+  // 3. Shop & Inventory (keeping for backwards compatibility)
   Hive.registerAdapter(ShopItemAdapter());
   Hive.registerAdapter(InventoryAdapter());
 
@@ -57,6 +57,15 @@ void _registerAdapters() {
   // 5. Saved Meals
   Hive.registerAdapter(SavedMealAdapter());
   Hive.registerAdapter(SavedMealItemAdapter());
+
+  // 6. Hunter Skills & Self-Improvement
+  Hive.registerAdapter(SkillAdapter());
+  Hive.registerAdapter(PRHistoryEntryAdapter());
+  Hive.registerAdapter(PersonalRecordAdapter());
+  Hive.registerAdapter(MilestoneAdapter());
+  Hive.registerAdapter(GoalAdapter());
+  Hive.registerAdapter(HabitAdapter());
+  Hive.registerAdapter(ActivityLogAdapter());
 }
 
 class SoloLevelingApp extends StatelessWidget {

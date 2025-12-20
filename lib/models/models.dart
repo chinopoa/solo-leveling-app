@@ -9,3 +9,10 @@ export 'shop_item.dart';
 export 'nutrition_entry.dart';
 export 'nutrition_goals.dart';
 export 'saved_meal.dart';
+
+// New self-improvement models
+export 'skill.dart';
+export 'personal_record.dart';
+export 'goal.dart';
+export 'habit.dart';
+export 'activity_log.dart';

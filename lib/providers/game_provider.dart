@@ -20,6 +20,13 @@ class GameProvider extends ChangeNotifier {
   late Box<NutritionGoals> _nutritionGoalsBox;
   late Box<SavedMeal> _savedMealBox;
 
+  // New self-improvement boxes
+  late Box<Skill> _skillBox;
+  late Box<PersonalRecord> _prBox;
+  late Box<Goal> _goalBox;
+  late Box<Habit> _habitBox;
+  late Box<ActivityLog> _activityLogBox;
+
   Player? _player;
   List<Quest> _quests = [];
   List<Quest> _dailyQuests = [];
@@ -36,6 +43,13 @@ class GameProvider extends ChangeNotifier {
 
   // Saved meals
   List<SavedMeal> _savedMeals = [];
+
+  // Hunter Skills & Self-Improvement
+  List<Skill> _skills = [];
+  List<PersonalRecord> _personalRecords = [];
+  List<Goal> _goals = [];
+  List<Habit> _habits = [];
+  List<ActivityLog> _activityLogs = [];
 
   // Level up state
   bool _showLevelUp = false;
@@ -125,6 +139,41 @@ class GameProvider extends ChangeNotifier {
   bool get autoBackupEnabled => _autoBackupEnabled;
   List<SavedMeal> get savedMeals => _savedMeals;
 
+  // Hunter Skills & Self-Improvement getters
+  List<Skill> get skills => _skills;
+  List<PersonalRecord> get personalRecords => _personalRecords;
+  List<Goal> get goals => _goals;
+  List<Goal> get activeGoals => _goals.where((g) => g.isActive).toList();
+  List<Goal> get completedGoals => _goals.where((g) => g.isCompleted).toList();
+  List<Habit> get habits => _habits;
+  List<Habit> get activeHabits => _habits.where((h) => h.isEnabled).toList();
+  List<Habit> get todayHabits => _habits.where((h) => h.isEnabled && h.isDueToday).toList();
+  List<ActivityLog> get activityLogs => _activityLogs;
+
+  // Get activity-based stat bonuses
+  Map<String, int> get activityStatBonuses {
+    final bonuses = <String, int>{
+      'STR': 0,
+      'AGI': 0,
+      'VIT': 0,
+      'INT': 0,
+      'SEN': 0,
+    };
+    for (final log in _activityLogs) {
+      if (log.statAffected != null) {
+        bonuses[log.statAffected!] = (bonuses[log.statAffected!] ?? 0) + log.statPoints;
+      }
+    }
+    return bonuses;
+  }
+
+  // Get effective stat (base + activity bonus)
+  int getEffectiveStat(String stat) {
+    final base = _player?.stats.toMap()[stat] ?? 10;
+    final activityBonus = (activityStatBonuses[stat] ?? 0) ~/ 100; // Every 100 points = +1
+    return base + activityBonus;
+  }
+
   // Time until daily reset
   Duration get timeUntilReset {
     final now = DateTime.now();
@@ -153,6 +202,13 @@ class GameProvider extends ChangeNotifier {
     _nutritionEntryBox = await Hive.openBox<NutritionEntry>('nutritionEntries');
     _nutritionGoalsBox = await Hive.openBox<NutritionGoals>('nutritionGoals');
     _savedMealBox = await Hive.openBox<SavedMeal>('savedMeals');
+
+    // Open self-improvement boxes
+    _skillBox = await Hive.openBox<Skill>('skills');
+    _prBox = await Hive.openBox<PersonalRecord>('personalRecords');
+    _goalBox = await Hive.openBox<Goal>('goals');
+    _habitBox = await Hive.openBox<Habit>('habits');
+    _activityLogBox = await Hive.openBox<ActivityLog>('activityLogs');
 
     // Load auto-backup setting
     final prefs = await SharedPreferences.getInstance();
@@ -211,7 +267,37 @@ class GameProvider extends ChangeNotifier {
     // Load saved meals
     _savedMeals = _savedMealBox.values.toList();
 
+    // Load self-improvement data
+    await _loadSelfImprovementData();
+
     notifyListeners();
+  }
+
+  Future<void> _loadSelfImprovementData() async {
+    // Load or create default skills
+    if (_skillBox.isEmpty) {
+      for (final skill in Skill.createDefaultSkills()) {
+        await _skillBox.put(skill.id, skill);
+      }
+    }
+    _skills = _skillBox.values.toList();
+
+    // Load or create default personal records
+    if (_prBox.isEmpty) {
+      for (final pr in PersonalRecord.createDefaultRecords()) {
+        await _prBox.put(pr.id, pr);
+      }
+    }
+    _personalRecords = _prBox.values.toList();
+
+    // Load goals
+    _goals = _goalBox.values.toList();
+
+    // Load habits
+    _habits = _habitBox.values.toList();
+
+    // Load activity logs
+    _activityLogs = _activityLogBox.values.toList();
   }
 
   Future<void> _loadNutritionData() async {
@@ -407,9 +493,29 @@ class GameProvider extends ChangeNotifier {
     addXp(quest.xpReward);
     _player?.addGold(quest.goldReward);
 
-    // Add stat bonus if applicable
+    // Log activity and add to skills
     if (quest.statBonus != null && quest.statBonusAmount > 0) {
-      // Stat bonuses from quests don't use allocation points
+      // Log activity
+      await logActivity(
+        activityType: ActivityLog.getActivityForStat(quest.statBonus!)?.name ?? 'quest',
+        statAffected: quest.statBonus,
+        points: quest.statBonusAmount * 10, // Scale stat bonus to activity points
+        sourceId: quest.id,
+        sourceType: 'quest',
+        xpEarned: quest.xpReward,
+      );
+
+      // Add XP to related skill
+      final skill = getSkillByStat(quest.statBonus!);
+      if (skill != null) {
+        await addSkillXp(skill.id, quest.statBonusAmount * 5);
+      }
+    }
+
+    // Check for daily streak PR
+    if (_player != null) {
+      await checkAndUpdatePR('Longest Daily Streak', _player!.dailyStreak.toDouble());
+      await checkAndUpdatePR('Highest Level', _player!.level.toDouble());
     }
 
     notifyListeners();
@@ -747,6 +853,198 @@ class GameProvider extends ChangeNotifier {
     );
   }
 
+  // ==================== HUNTER SKILLS ====================
+
+  /// Add XP to a skill
+  Future<bool> addSkillXp(String skillId, int xp) async {
+    final skill = _skills.firstWhere(
+      (s) => s.id == skillId,
+      orElse: () => throw Exception('Skill not found'),
+    );
+
+    final didRankUp = skill.addXp(xp);
+    notifyListeners();
+    _triggerAutoBackup();
+    return didRankUp;
+  }
+
+  /// Get skill by related stat
+  Skill? getSkillByStat(String stat) {
+    try {
+      return _skills.firstWhere((s) => s.relatedStat == stat);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ==================== PERSONAL RECORDS ====================
+
+  /// Check and update a personal record
+  Future<bool> checkAndUpdatePR(String prName, double value) async {
+    try {
+      final pr = _personalRecords.firstWhere((p) => p.name == prName);
+      if (pr.updateRecord(value)) {
+        notifyListeners();
+        _triggerAutoBackup();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('PR not found: $prName');
+    }
+    return false;
+  }
+
+  /// Get personal records by category
+  List<PersonalRecord> getPRsByCategory(String category) {
+    return _personalRecords.where((p) => p.category == category).toList();
+  }
+
+  // ==================== GOALS (RAIDS) ====================
+
+  /// Add a new goal
+  Future<void> addGoal(Goal goal) async {
+    await _goalBox.put(goal.id, goal);
+    _goals.add(goal);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Update goal progress
+  Future<List<String>> updateGoalProgress(String goalId, double progress) async {
+    final goal = _goals.firstWhere((g) => g.id == goalId);
+    final completedMilestones = goal.updateProgress(progress);
+
+    // Award XP for completed milestones
+    for (final milestone in goal.milestones.where((m) => m.isCompleted)) {
+      // Only award XP if just completed (check by looking at completedMilestones)
+      if (completedMilestones.contains(milestone.title)) {
+        addXp(milestone.xpReward);
+      }
+    }
+
+    // Award XP if goal was just completed
+    if (goal.isCompleted && completedMilestones.isNotEmpty) {
+      addXp(goal.xpReward);
+    }
+
+    notifyListeners();
+    _triggerAutoBackup();
+    return completedMilestones;
+  }
+
+  /// Delete a goal
+  Future<void> deleteGoal(String goalId) async {
+    await _goalBox.delete(goalId);
+    _goals.removeWhere((g) => g.id == goalId);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  // ==================== HABITS (TRAINING REGIMEN) ====================
+
+  /// Add a new habit
+  Future<void> addHabit(Habit habit) async {
+    await _habitBox.put(habit.id, habit);
+    _habits.add(habit);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Complete a habit for today
+  Future<void> completeHabit(String habitId) async {
+    final habit = _habits.firstWhere((h) => h.id == habitId);
+
+    if (!habit.isCompletedToday) {
+      habit.completeToday();
+
+      // Award XP
+      addXp(habit.xpPerCompletion);
+
+      // Log activity
+      await logActivity(
+        activityType: habit.relatedStat != null
+            ? ActivityLog.getActivityForStat(habit.relatedStat!)?.name ?? 'habit'
+            : 'habit',
+        statAffected: habit.relatedStat,
+        points: habit.relatedStat != null ? 5 : 0,
+        sourceId: habit.id,
+        sourceType: 'habit',
+      );
+
+      // Add XP to related skill
+      if (habit.relatedSkillId != null) {
+        await addSkillXp(habit.relatedSkillId!, 10);
+      } else if (habit.relatedStat != null) {
+        final skill = getSkillByStat(habit.relatedStat!);
+        if (skill != null) {
+          await addSkillXp(skill.id, 10);
+        }
+      }
+
+      // Check for streak PR
+      await checkAndUpdatePR('Longest Training Streak', habit.currentStreak.toDouble());
+
+      notifyListeners();
+      _triggerAutoBackup();
+    }
+  }
+
+  /// Uncomplete a habit for today
+  Future<void> uncompleteHabit(String habitId) async {
+    final habit = _habits.firstWhere((h) => h.id == habitId);
+    habit.uncompleteForDate(DateTime.now());
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Update a habit
+  Future<void> updateHabit(Habit habit) async {
+    await _habitBox.put(habit.id, habit);
+    final index = _habits.indexWhere((h) => h.id == habit.id);
+    if (index >= 0) {
+      _habits[index] = habit;
+    }
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Delete a habit
+  Future<void> deleteHabit(String habitId) async {
+    await _habitBox.delete(habitId);
+    _habits.removeWhere((h) => h.id == habitId);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  // ==================== ACTIVITY LOGGING ====================
+
+  /// Log an activity
+  Future<void> logActivity({
+    required String activityType,
+    String? statAffected,
+    int points = 0,
+    String? sourceId,
+    required String sourceType,
+    String? note,
+    int xpEarned = 0,
+    String? skillId,
+  }) async {
+    final log = ActivityLog(
+      activityType: activityType,
+      statAffected: statAffected,
+      statPoints: points,
+      sourceId: sourceId,
+      sourceType: sourceType,
+      note: note,
+      xpEarned: xpEarned,
+      skillId: skillId,
+    );
+
+    await _activityLogBox.put(log.id, log);
+    _activityLogs.add(log);
+    notifyListeners();
+  }
+
   // ==================== RESET METHODS ====================
 
   // Reset today's daily quest progress
@@ -776,6 +1074,13 @@ class GameProvider extends ChangeNotifier {
     await _dailyProgressBox.clear();
     await _nutritionEntryBox.clear();
     await _nutritionGoalsBox.clear();
+
+    // Clear self-improvement boxes
+    await _skillBox.clear();
+    await _prBox.clear();
+    await _goalBox.clear();
+    await _habitBox.clear();
+    await _activityLogBox.clear();
 
     // Reset daily configs to defaults
     await _dailyConfigBox.clear();

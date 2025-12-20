@@ -6,7 +6,8 @@ import '../widgets/level_up_overlay.dart';
 import 'status_screen.dart';
 import 'daily_quest_screen.dart';
 import 'quests_screen.dart';
-import 'shop_screen.dart';
+import 'hunter_screen.dart';
+import 'raids_screen.dart';
 import 'settings_screen.dart';
 
 /// Main home screen with bottom navigation
@@ -24,16 +25,16 @@ class _HomeScreenState extends State<HomeScreen> {
     StatusScreen(),
     DailyQuestScreen(),
     QuestsScreen(),
-    ShopScreen(),
-    SettingsScreen(),
+    HunterScreen(),
+    RaidsScreen(),
   ];
 
   final List<String> _titles = const [
     'STATUS',
     'DAILY QUEST',
     'QUESTS',
-    'SHOP',
-    'SETTINGS',
+    'HUNTER',
+    'RAIDS',
   ];
 
   @override
@@ -47,37 +48,18 @@ class _HomeScreenState extends State<HomeScreen> {
               appBar: AppBar(
                 title: Text(_titles[_currentIndex]),
                 actions: [
-                  // Gold display in app bar
-                  Container(
-                    margin: const EdgeInsets.only(right: 16),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.amber.withOpacity(0.5),
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.monetization_on,
-                          color: Colors.amber,
-                          size: 16,
+                  // Settings gear icon
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    color: SoloLevelingTheme.textMuted,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${game.player?.gold ?? 0}',
-                          style: const TextStyle(
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -108,12 +90,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: 'Quests',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.store),
-                      label: 'Shop',
+                      icon: Icon(Icons.shield),
+                      label: 'Hunter',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.settings),
-                      label: 'Settings',
+                      icon: Icon(Icons.flag),
+                      label: 'Raids',
                     ),
                   ],
                 ),
