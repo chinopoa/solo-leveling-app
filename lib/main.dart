@@ -66,6 +66,12 @@ void _registerAdapters() {
   Hive.registerAdapter(GoalAdapter());
   Hive.registerAdapter(HabitAdapter());
   Hive.registerAdapter(ActivityLogAdapter());
+
+  // 7. Workout/Training System
+  Hive.registerAdapter(ExercisePRHistoryAdapter());
+  Hive.registerAdapter(ExerciseAdapter());
+  Hive.registerAdapter(WorkoutSetAdapter());
+  Hive.registerAdapter(WorkoutSessionAdapter());
 }
 
 class SoloLevelingApp extends StatelessWidget {

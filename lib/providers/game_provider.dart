@@ -27,6 +27,10 @@ class GameProvider extends ChangeNotifier {
   late Box<Habit> _habitBox;
   late Box<ActivityLog> _activityLogBox;
 
+  // Workout/Training boxes
+  late Box<Exercise> _exerciseBox;
+  late Box<WorkoutSession> _workoutSessionBox;
+
   Player? _player;
   List<Quest> _quests = [];
   List<Quest> _dailyQuests = [];
@@ -50,6 +54,11 @@ class GameProvider extends ChangeNotifier {
   List<Goal> _goals = [];
   List<Habit> _habits = [];
   List<ActivityLog> _activityLogs = [];
+
+  // Workout/Training
+  List<Exercise> _exercises = [];
+  List<WorkoutSession> _workoutSessions = [];
+  WorkoutSession? _activeWorkout;
 
   // Level up state
   bool _showLevelUp = false;
@@ -150,6 +159,28 @@ class GameProvider extends ChangeNotifier {
   List<Habit> get todayHabits => _habits.where((h) => h.isEnabled && h.isDueToday).toList();
   List<ActivityLog> get activityLogs => _activityLogs;
 
+  // Workout/Training getters
+  List<Exercise> get exercises => _exercises;
+  List<WorkoutSession> get workoutSessions => _workoutSessions;
+  WorkoutSession? get activeWorkout => _activeWorkout;
+  bool get hasActiveWorkout => _activeWorkout != null;
+
+  List<Exercise> getExercisesByMuscleGroup(String muscleGroup) {
+    return _exercises.where((e) => e.muscleGroup == muscleGroup).toList();
+  }
+
+  List<Exercise> getExercisesByArmSubGroup(String subGroup) {
+    return _exercises.where((e) => e.armSubGroup == subGroup).toList();
+  }
+
+  Exercise? getExerciseById(String id) {
+    try {
+      return _exercises.firstWhere((e) => e.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
   // Get activity-based stat bonuses
   Map<String, int> get activityStatBonuses {
     final bonuses = <String, int>{
@@ -209,6 +240,10 @@ class GameProvider extends ChangeNotifier {
     _goalBox = await Hive.openBox<Goal>('goals');
     _habitBox = await Hive.openBox<Habit>('habits');
     _activityLogBox = await Hive.openBox<ActivityLog>('activityLogs');
+
+    // Open workout/training boxes
+    _exerciseBox = await Hive.openBox<Exercise>('exercises');
+    _workoutSessionBox = await Hive.openBox<WorkoutSession>('workoutSessions');
 
     // Load auto-backup setting
     final prefs = await SharedPreferences.getInstance();
@@ -270,6 +305,9 @@ class GameProvider extends ChangeNotifier {
     // Load self-improvement data
     await _loadSelfImprovementData();
 
+    // Load workout/training data
+    await _loadWorkoutData();
+
     notifyListeners();
   }
 
@@ -298,6 +336,26 @@ class GameProvider extends ChangeNotifier {
 
     // Load activity logs
     _activityLogs = _activityLogBox.values.toList();
+  }
+
+  Future<void> _loadWorkoutData() async {
+    // Load or create default exercises
+    if (_exerciseBox.isEmpty) {
+      for (final exercise in Exercise.createDefaultExercises()) {
+        await _exerciseBox.put(exercise.id, exercise);
+      }
+    }
+    _exercises = _exerciseBox.values.toList();
+
+    // Load workout sessions
+    _workoutSessions = _workoutSessionBox.values.toList();
+
+    // Check for active workout (not ended)
+    try {
+      _activeWorkout = _workoutSessions.firstWhere((w) => w.isActive);
+    } catch (e) {
+      _activeWorkout = null;
+    }
   }
 
   Future<void> _loadNutritionData() async {
@@ -1045,6 +1103,211 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ==================== WORKOUT/TRAINING SYSTEM ====================
+
+  /// Add a new exercise to the Skill Book
+  Future<void> addExercise(Exercise exercise) async {
+    await _exerciseBox.put(exercise.id, exercise);
+    _exercises.add(exercise);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Update an exercise
+  Future<void> updateExercise(Exercise exercise) async {
+    await _exerciseBox.put(exercise.id, exercise);
+    final index = _exercises.indexWhere((e) => e.id == exercise.id);
+    if (index >= 0) {
+      _exercises[index] = exercise;
+    }
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Delete an exercise
+  Future<void> deleteExercise(String exerciseId) async {
+    await _exerciseBox.delete(exerciseId);
+    _exercises.removeWhere((e) => e.id == exerciseId);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Start a new workout session
+  Future<WorkoutSession> startWorkout({String? name}) async {
+    final session = WorkoutSession(name: name);
+    await _workoutSessionBox.put(session.id, session);
+    _workoutSessions.add(session);
+    _activeWorkout = session;
+    notifyListeners();
+    return session;
+  }
+
+  /// Add a set to the active workout
+  Future<void> addSetToWorkout({
+    required String exerciseId,
+    required double weight,
+    required int reps,
+    bool isPR = false,
+    String? note,
+  }) async {
+    if (_activeWorkout == null) return;
+
+    final exercise = getExerciseById(exerciseId);
+    if (exercise == null) return;
+
+    // Determine set number for this exercise
+    final existingSets = _activeWorkout!.getSetsForExercise(exerciseId);
+    final setNumber = existingSets.length + 1;
+
+    final set = WorkoutSet(
+      exerciseId: exerciseId,
+      exerciseName: exercise.name,
+      weight: weight,
+      reps: reps,
+      isPR: isPR,
+      note: note,
+      setNumber: setNumber,
+    );
+
+    _activeWorkout!.addSet(set);
+
+    // Add muscle group if not already tracked
+    if (!_activeWorkout!.muscleGroupsWorked.contains(exercise.muscleGroup)) {
+      _activeWorkout!.muscleGroupsWorked.add(exercise.muscleGroup);
+    }
+
+    // Update exercise last performance (Ghost data)
+    exercise.updateLastPerformance(weight, reps);
+
+    // If marked as PR, update exercise PR
+    if (isPR && exercise.isNewPR(weight, reps)) {
+      exercise.updatePR(weight, reps, note: note);
+
+      // Award XP for setting a PR
+      addXp(25);
+
+      // Log activity
+      await logActivity(
+        activityType: 'strength',
+        statAffected: 'STR',
+        points: 10,
+        sourceId: exerciseId,
+        sourceType: 'workout_pr',
+        note: 'New PR: ${weight}kg × $reps on ${exercise.name}',
+        xpEarned: 25,
+      );
+    }
+
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Toggle PR status on a set
+  Future<void> toggleSetPR(String setId, bool isPR) async {
+    if (_activeWorkout == null) return;
+
+    final setIndex = _activeWorkout!.sets.indexWhere((s) => s.id == setId);
+    if (setIndex < 0) return;
+
+    final set = _activeWorkout!.sets[setIndex];
+    final exercise = getExerciseById(set.exerciseId);
+
+    if (isPR && !set.isPR) {
+      // Marking as PR
+      set.isPR = true;
+      _activeWorkout!.totalPRs++;
+
+      if (exercise != null && exercise.isNewPR(set.weight, set.reps)) {
+        exercise.updatePR(set.weight, set.reps);
+        addXp(25);
+      }
+    } else if (!isPR && set.isPR) {
+      // Unmarking PR
+      set.isPR = false;
+      _activeWorkout!.totalPRs--;
+    }
+
+    _activeWorkout!.save();
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// End the active workout
+  Future<void> endWorkout({String? notes}) async {
+    if (_activeWorkout == null) return;
+
+    _activeWorkout!.endWorkout(sessionNotes: notes);
+
+    // Award XP based on workout stats
+    final xpReward = 10 + (_activeWorkout!.totalSets * 2) + (_activeWorkout!.totalPRs * 10);
+    addXp(xpReward);
+
+    // Log activity
+    await logActivity(
+      activityType: 'strength',
+      statAffected: 'STR',
+      points: _activeWorkout!.totalSets * 2,
+      sourceId: _activeWorkout!.id,
+      sourceType: 'workout',
+      note: _activeWorkout!.summary,
+      xpEarned: xpReward,
+    );
+
+    _activeWorkout = null;
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Cancel the active workout without saving
+  Future<void> cancelWorkout() async {
+    if (_activeWorkout == null) return;
+
+    await _workoutSessionBox.delete(_activeWorkout!.id);
+    _workoutSessions.removeWhere((w) => w.id == _activeWorkout!.id);
+    _activeWorkout = null;
+    notifyListeners();
+  }
+
+  /// Get recent workouts (last 10)
+  List<WorkoutSession> get recentWorkouts {
+    final completed = _workoutSessions.where((w) => !w.isActive).toList();
+    completed.sort((a, b) => b.startTime.compareTo(a.startTime));
+    return completed.take(10).toList();
+  }
+
+  /// Get last performance for an exercise (Ghost data)
+  Map<String, dynamic>? getLastPerformance(String exerciseId) {
+    final exercise = getExerciseById(exerciseId);
+    if (exercise == null || exercise.lastWeight == null) return null;
+
+    return {
+      'weight': exercise.lastWeight,
+      'reps': exercise.lastReps,
+      'date': exercise.lastPerformedAt,
+    };
+  }
+
+  /// Manually set a PR for an exercise (Hunter Records override)
+  Future<void> setExercisePR(String exerciseId, double weight, int reps) async {
+    final exercise = getExerciseById(exerciseId);
+    if (exercise == null) return;
+
+    exercise.updatePR(weight, reps, note: 'Manual entry');
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Update exercise notes
+  Future<void> updateExerciseNotes(String exerciseId, String notes) async {
+    final exercise = getExerciseById(exerciseId);
+    if (exercise == null) return;
+
+    exercise.notes = notes;
+    await exercise.save();
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
   // ==================== RESET METHODS ====================
 
   // Reset today's daily quest progress
@@ -1081,6 +1344,10 @@ class GameProvider extends ChangeNotifier {
     await _goalBox.clear();
     await _habitBox.clear();
     await _activityLogBox.clear();
+
+    // Clear workout boxes
+    await _exerciseBox.clear();
+    await _workoutSessionBox.clear();
 
     // Reset daily configs to defaults
     await _dailyConfigBox.clear();

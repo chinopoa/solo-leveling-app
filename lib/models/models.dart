@@ -16,3 +16,8 @@ export 'personal_record.dart';
 export 'goal.dart';
 export 'habit.dart';
 export 'activity_log.dart';
+
+// Workout/Training models
+export 'exercise.dart';
+export 'workout_set.dart';
+export 'workout_session.dart';
