@@ -3,10 +3,15 @@ import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
 import '../models/models.dart';
+import '../widgets/system_window.dart';
 
-/// Main workout screen with Skill Book and active workout
+/// Main training screen with habits, Skill Book, and workout logging
 class WorkoutScreen extends StatefulWidget {
-  const WorkoutScreen({super.key});
+  final List<Habit>? habits;
+  final List<Habit>? allHabits;
+  final GameProvider? game;
+
+  const WorkoutScreen({super.key, this.habits, this.allHabits, this.game});
 
   @override
   State<WorkoutScreen> createState() => _WorkoutScreenState();
@@ -47,6 +52,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Widget _buildSkillBook(BuildContext context, GameProvider game) {
     List<Exercise> filteredExercises = game.exercises;
+    final todayHabits = widget.habits ?? game.todayHabits;
 
     // Filter by muscle group
     if (_selectedMuscleGroup != null) {
@@ -57,135 +63,148 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       }
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Start Workout Button
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: SoloLevelingTheme.backgroundCard,
-              border: Border.all(
-                color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  '⚔️ COMBAT TRAINING',
-                  style: TextStyle(
-                    color: SoloLevelingTheme.primaryCyan,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () => _showStartWorkoutDialog(context, game),
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('START RAID'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: SoloLevelingTheme.primaryCyan,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Workout History Section
-          if (game.recentWorkouts.isNotEmpty) ...[
-            Row(
-              children: [
-                const Text(
-                  '📜 RAID HISTORY',
-                  style: TextStyle(
-                    color: SoloLevelingTheme.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => _showWorkoutHistory(context, game),
-                  child: const Text('View All', style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 80,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: game.recentWorkouts.take(5).length,
-                itemBuilder: (context, index) {
-                  final workout = game.recentWorkouts[index];
-                  return Container(
-                    width: 140,
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: SoloLevelingTheme.backgroundCard,
-                      border: Border.all(color: SoloLevelingTheme.textMuted.withValues(alpha: 0.2)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          workout.name ?? 'Workout',
-                          style: const TextStyle(
-                            color: SoloLevelingTheme.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          workout.formattedDate,
-                          style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 10),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${workout.totalSets} sets • ${workout.totalPRs} PRs',
-                          style: TextStyle(color: SoloLevelingTheme.primaryCyan, fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Skill Book Header
-          Row(
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                '📖 SKILL BOOK',
-                style: TextStyle(
-                  color: SoloLevelingTheme.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+              // Today's Habits Section
+              if (todayHabits.isNotEmpty) ...[
+                SystemWindow(
+                  title: '[TODAY\'S REGIMEN]',
+                  child: Column(
+                    children: todayHabits.map((h) => _buildHabitRow(h, game)).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Start Workout Button
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: SoloLevelingTheme.backgroundCard,
+                  border: Border.all(
+                    color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      '⚔️ COMBAT TRAINING',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.primaryCyan,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _showStartWorkoutDialog(context, game),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('START WORKOUT'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SoloLevelingTheme.primaryCyan,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => _showAddExerciseDialog(context, game),
-                icon: const Icon(Icons.add, color: SoloLevelingTheme.primaryCyan),
-                tooltip: 'Add Exercise',
+
+              const SizedBox(height: 16),
+
+              // Workout History Section
+              if (game.recentWorkouts.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Text(
+                      '📜 WORKOUT HISTORY',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => _showWorkoutHistory(context, game),
+                      child: const Text('View All', style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 80,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: game.recentWorkouts.take(5).length,
+                    itemBuilder: (context, index) {
+                      final workout = game.recentWorkouts[index];
+                      return Container(
+                        width: 140,
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: SoloLevelingTheme.backgroundCard,
+                          border: Border.all(color: SoloLevelingTheme.textMuted.withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              workout.name ?? 'Workout',
+                              style: const TextStyle(
+                                color: SoloLevelingTheme.textPrimary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              workout.formattedDate,
+                              style: const TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 10),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${workout.totalSets} sets • ${workout.totalPRs} PRs',
+                              style: const TextStyle(color: SoloLevelingTheme.primaryCyan, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Skill Book Header
+              Row(
+                children: [
+                  const Text(
+                    '📖 SKILL BOOK',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => _showAddExerciseDialog(context, game),
+                    icon: const Icon(Icons.add, color: SoloLevelingTheme.primaryCyan),
+                    tooltip: 'Add Exercise',
+                  ),
+                ],
               ),
-            ],
-          ),
 
           const SizedBox(height: 12),
 
@@ -252,7 +271,237 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 80), // Space for FAB
         ],
+      ),
+    ),
+    // Add Habit FAB
+    Positioned(
+      right: 16,
+      bottom: 16,
+      child: FloatingActionButton(
+        onPressed: () => _showAddHabitDialog(context, game),
+        backgroundColor: SoloLevelingTheme.accentPurple,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    ),
+  ],
+);
+  }
+
+  Widget _buildHabitRow(Habit habit, GameProvider game) {
+    final isCompleted = habit.isCompletedToday;
+
+    return InkWell(
+      onTap: () {
+        if (!isCompleted) {
+          game.completeHabit(habit.id);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: SoloLevelingTheme.textMuted.withValues(alpha: 0.2),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCompleted
+                    ? SoloLevelingTheme.successGreen
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isCompleted
+                      ? SoloLevelingTheme.successGreen
+                      : SoloLevelingTheme.textMuted,
+                  width: 2,
+                ),
+              ),
+              child: isCompleted
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            if (habit.iconEmoji != null)
+              Text(habit.iconEmoji!, style: const TextStyle(fontSize: 20)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                habit.name,
+                style: TextStyle(
+                  color: isCompleted
+                      ? SoloLevelingTheme.textMuted
+                      : SoloLevelingTheme.textPrimary,
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (habit.currentStreak > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: SoloLevelingTheme.xpGold.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.local_fire_department,
+                      size: 14,
+                      color: SoloLevelingTheme.xpGold,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${habit.currentStreak}',
+                      style: const TextStyle(
+                        color: SoloLevelingTheme.xpGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddHabitDialog(BuildContext context, GameProvider game) {
+    final nameController = TextEditingController();
+    String selectedEmoji = '⚡';
+    String? selectedStat;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: SoloLevelingTheme.backgroundCard,
+          title: const Text(
+            '[NEW REGIMEN]',
+            style: TextStyle(
+              color: SoloLevelingTheme.accentPurple,
+              letterSpacing: 2,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Habit Name',
+                    labelStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Related Stat (optional)',
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: ['STR', 'AGI', 'VIT', 'INT', 'SEN']
+                      .map((stat) => GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedStat = selectedStat == stat ? null : stat;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: selectedStat == stat
+                                      ? SoloLevelingTheme.primaryCyan
+                                      : SoloLevelingTheme.textMuted,
+                                ),
+                                color: selectedStat == stat
+                                    ? SoloLevelingTheme.primaryCyan.withValues(alpha: 0.2)
+                                    : null,
+                              ),
+                              child: Text(
+                                stat,
+                                style: TextStyle(
+                                  color: selectedStat == stat
+                                      ? SoloLevelingTheme.primaryCyan
+                                      : SoloLevelingTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  children: ['⚡', '🏋️', '📖', '🧘', '💊', '🌅', '✍️', '🎵']
+                      .map((e) => GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedEmoji = e;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: selectedEmoji == e
+                                      ? SoloLevelingTheme.accentPurple
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Text(e, style: const TextStyle(fontSize: 24)),
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (nameController.text.isNotEmpty) {
+                  final habit = Habit(
+                    name: nameController.text,
+                    iconEmoji: selectedEmoji,
+                    relatedStat: selectedStat,
+                  );
+                  game.addHabit(habit);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text(
+                'ADD REGIMEN',
+                style: TextStyle(color: SoloLevelingTheme.accentPurple),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
