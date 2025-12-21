@@ -9,7 +9,7 @@ enum SkillRank { e, d, c, b, a, s }
 /// Skill categories matching the stat system
 enum SkillCategory { combat, agility, vitality, intelligence, perception }
 
-@HiveType(typeId: 10)
+@HiveType(typeId: 17)
 class Skill extends HiveObject {
   @HiveField(0)
   String id;

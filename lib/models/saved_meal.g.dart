@@ -8,7 +8,7 @@ part of 'saved_meal.dart';
 
 class SavedMealItemAdapter extends TypeAdapter<SavedMealItem> {
   @override
-  final int typeId = 14;
+  final int typeId = 20;
 
   @override
   SavedMealItem read(BinaryReader reader) {
@@ -72,7 +72,7 @@ class SavedMealItemAdapter extends TypeAdapter<SavedMealItem> {
 
 class SavedMealAdapter extends TypeAdapter<SavedMeal> {
   @override
-  final int typeId = 15;
+  final int typeId = 21;
 
   @override
   SavedMeal read(BinaryReader reader) {

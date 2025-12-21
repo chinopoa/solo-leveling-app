@@ -6,7 +6,7 @@ part 'personal_record.g.dart';
 /// Categories for personal records
 enum PRCategory { fitness, streak, achievement, nutrition }
 
-@HiveType(typeId: 11)
+@HiveType(typeId: 18)
 class PRHistoryEntry {
   @HiveField(0)
   double value;
@@ -24,7 +24,7 @@ class PRHistoryEntry {
   });
 }
 
-@HiveType(typeId: 12)
+@HiveType(typeId: 19)
 class PersonalRecord extends HiveObject {
   @HiveField(0)
   String id;

@@ -8,7 +8,7 @@ part of 'skill.dart';
 
 class SkillAdapter extends TypeAdapter<Skill> {
   @override
-  final int typeId = 10;
+  final int typeId = 17;
 
   @override
   Skill read(BinaryReader reader) {

@@ -8,7 +8,7 @@ part of 'personal_record.dart';
 
 class PRHistoryEntryAdapter extends TypeAdapter<PRHistoryEntry> {
   @override
-  final int typeId = 11;
+  final int typeId = 18;
 
   @override
   PRHistoryEntry read(BinaryReader reader) {
@@ -48,7 +48,7 @@ class PRHistoryEntryAdapter extends TypeAdapter<PRHistoryEntry> {
 
 class PersonalRecordAdapter extends TypeAdapter<PersonalRecord> {
   @override
-  final int typeId = 12;
+  final int typeId = 19;
 
   @override
   PersonalRecord read(BinaryReader reader) {

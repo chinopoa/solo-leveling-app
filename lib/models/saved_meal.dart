@@ -3,7 +3,7 @@ import 'package:hive/hive.dart';
 part 'saved_meal.g.dart';
 
 /// A food item within a saved meal
-@HiveType(typeId: 14)
+@HiveType(typeId: 20)
 class SavedMealItem extends HiveObject {
   @HiveField(0)
   String name;
@@ -93,7 +93,7 @@ class SavedMealItem extends HiveObject {
 }
 
 /// A saved meal that can be quickly added
-@HiveType(typeId: 15)
+@HiveType(typeId: 21)
 class SavedMeal extends HiveObject {
   @HiveField(0)
   String id;
