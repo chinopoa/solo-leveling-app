@@ -97,7 +97,74 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // Workout History Section
+          if (game.recentWorkouts.isNotEmpty) ...[
+            Row(
+              children: [
+                const Text(
+                  '📜 RAID HISTORY',
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => _showWorkoutHistory(context, game),
+                  child: const Text('View All', style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: game.recentWorkouts.take(5).length,
+                itemBuilder: (context, index) {
+                  final workout = game.recentWorkouts[index];
+                  return Container(
+                    width: 140,
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: SoloLevelingTheme.backgroundCard,
+                      border: Border.all(color: SoloLevelingTheme.textMuted.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          workout.name ?? 'Workout',
+                          style: const TextStyle(
+                            color: SoloLevelingTheme.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          workout.formattedDate,
+                          style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 10),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${workout.totalSets} sets • ${workout.totalPRs} PRs',
+                          style: TextStyle(color: SoloLevelingTheme.primaryCyan, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Skill Book Header
           Row(
@@ -462,52 +529,63 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ),
 
           // Sets
-          ...sets.map((set) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: SoloLevelingTheme.textMuted.withValues(alpha: 0.1)),
+          ...sets.map((set) => GestureDetector(
+                onTap: () => _showEditSetDialog(context, set, game),
+                onLongPress: () => _showDeleteSetDialog(context, set, game),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: SoloLevelingTheme.textMuted.withValues(alpha: 0.1)),
+                    ),
+                    color: set.isPR ? Colors.amber.withValues(alpha: 0.1) : null,
                   ),
-                  color: set.isPR ? Colors.amber.withValues(alpha: 0.1) : null,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: SoloLevelingTheme.backgroundDark,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${set.setNumber}',
-                        style: TextStyle(
-                          color: SoloLevelingTheme.textMuted,
-                          fontSize: 12,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: SoloLevelingTheme.backgroundDark,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${set.setNumber}',
+                          style: const TextStyle(
+                            color: SoloLevelingTheme.textMuted,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        set.formattedSet,
-                        style: TextStyle(
-                          color: set.isPR ? Colors.amber : SoloLevelingTheme.textPrimary,
-                          fontWeight: set.isPR ? FontWeight.bold : FontWeight.normal,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          set.formattedSet,
+                          style: TextStyle(
+                            color: set.isPR ? Colors.amber : SoloLevelingTheme.textPrimary,
+                            fontWeight: set.isPR ? FontWeight.bold : FontWeight.normal,
+                          ),
                         ),
                       ),
-                    ),
-                    // Crown toggle
-                    IconButton(
-                      onPressed: () => game.toggleSetPR(set.id, !set.isPR),
-                      icon: Icon(
-                        set.isPR ? Icons.emoji_events : Icons.emoji_events_outlined,
-                        color: set.isPR ? Colors.amber : SoloLevelingTheme.textMuted,
-                        size: 20,
+                      // Edit hint
+                      Icon(
+                        Icons.edit,
+                        color: SoloLevelingTheme.textMuted.withValues(alpha: 0.3),
+                        size: 14,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      // Crown toggle
+                      IconButton(
+                        onPressed: () => game.toggleSetPR(set.id, !set.isPR),
+                        icon: Icon(
+                          set.isPR ? Icons.emoji_events : Icons.emoji_events_outlined,
+                          color: set.isPR ? Colors.amber : SoloLevelingTheme.textMuted,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )),
         ],
@@ -517,37 +595,118 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   void _showStartWorkoutDialog(BuildContext context, GameProvider game) {
     final controller = TextEditingController();
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: SoloLevelingTheme.backgroundCard,
-        title: const Text('Start Raid', style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
-        content: TextField(
-          controller: controller,
-          style: const TextStyle(color: SoloLevelingTheme.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'Workout name (optional)',
-            hintStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: SoloLevelingTheme.backgroundCard,
+          title: const Text('Start Raid', style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                decoration: const InputDecoration(
+                  hintText: 'Workout name (optional)',
+                  hintStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Date/Time picker for backdating
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate ?? DateTime.now(),
+                          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                          lastDate: DateTime.now(),
+                        );
+                        if (date != null) {
+                          setState(() => selectedDate = date);
+                        }
+                      },
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: Text(
+                        selectedDate != null
+                            ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                            : 'Today',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SoloLevelingTheme.textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime ?? TimeOfDay.now(),
+                        );
+                        if (time != null) {
+                          setState(() => selectedTime = time);
+                        }
+                      },
+                      icon: const Icon(Icons.access_time, size: 16),
+                      label: Text(
+                        selectedTime != null
+                            ? selectedTime!.format(context)
+                            : 'Now',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SoloLevelingTheme.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (selectedDate != null || selectedTime != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Backdating workout',
+                    style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 11),
+                  ),
+                ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: SoloLevelingTheme.textMuted)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await game.startWorkout(name: controller.text.isNotEmpty ? controller.text : null);
-              if (context.mounted) Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: SoloLevelingTheme.primaryCyan,
-              foregroundColor: Colors.black,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: SoloLevelingTheme.textMuted)),
             ),
-            child: const Text('START'),
-          ),
-        ],
+            ElevatedButton(
+              onPressed: () async {
+                DateTime? startTime;
+                if (selectedDate != null || selectedTime != null) {
+                  final date = selectedDate ?? DateTime.now();
+                  final time = selectedTime ?? TimeOfDay.now();
+                  startTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                }
+                await game.startWorkout(
+                  name: controller.text.isNotEmpty ? controller.text : null,
+                  startTime: startTime,
+                );
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: SoloLevelingTheme.primaryCyan,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('START'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1224,5 +1383,282 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  void _showEditSetDialog(BuildContext context, WorkoutSet set, GameProvider game) {
+    final weightController = TextEditingController(text: set.weight.toString());
+    final repsController = TextEditingController(text: set.reps.toString());
+    bool isPR = set.isPR;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: SoloLevelingTheme.backgroundCard,
+          title: Text(
+            'Edit Set ${set.setNumber}',
+            style: const TextStyle(color: SoloLevelingTheme.primaryCyan),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                set.exerciseName,
+                style: const TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: weightController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Weight (kg)',
+                        labelStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: repsController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Reps',
+                        labelStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => setState(() => isPR = !isPR),
+                child: Row(
+                  children: [
+                    Icon(
+                      isPR ? Icons.emoji_events : Icons.emoji_events_outlined,
+                      color: isPR ? Colors.amber : SoloLevelingTheme.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Mark as PR',
+                      style: TextStyle(
+                        color: isPR ? Colors.amber : SoloLevelingTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: SoloLevelingTheme.textMuted)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final weight = double.tryParse(weightController.text);
+                final reps = int.tryParse(repsController.text);
+
+                if (weight == null || reps == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter valid numbers')),
+                  );
+                  return;
+                }
+
+                await game.updateSet(
+                  setId: set.id,
+                  weight: weight,
+                  reps: reps,
+                  isPR: isPR,
+                );
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: SoloLevelingTheme.primaryCyan,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('SAVE'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteSetDialog(BuildContext context, WorkoutSet set, GameProvider game) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text('Delete Set?', style: TextStyle(color: Colors.red)),
+        content: Text(
+          'Delete ${set.formattedSet} from ${set.exerciseName}?',
+          style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: SoloLevelingTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await game.deleteSet(set.id);
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('DELETE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWorkoutHistory(BuildContext context, GameProvider game) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: SoloLevelingTheme.backgroundCard,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: const Text(
+                '📜 RAID HISTORY',
+                style: TextStyle(
+                  color: SoloLevelingTheme.primaryCyan,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+            Expanded(
+              child: game.workoutSessions.where((w) => !w.isActive).isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.fitness_center, color: SoloLevelingTheme.textMuted, size: 48),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No completed workouts yet',
+                            style: TextStyle(color: SoloLevelingTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: game.workoutSessions.where((w) => !w.isActive).length,
+                      itemBuilder: (context, index) {
+                        final workouts = game.workoutSessions
+                            .where((w) => !w.isActive)
+                            .toList()
+                          ..sort((a, b) => b.startTime.compareTo(a.startTime));
+                        final workout = workouts[index];
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: SoloLevelingTheme.backgroundDark,
+                            border: Border.all(
+                              color: SoloLevelingTheme.textMuted.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      workout.name ?? 'Workout',
+                                      style: const TextStyle(
+                                        color: SoloLevelingTheme.textPrimary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (workout.totalPRs > 0)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.emoji_events, color: Colors.amber, size: 14),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${workout.totalPRs} PR${workout.totalPRs > 1 ? 's' : ''}',
+                                            style: const TextStyle(color: Colors.amber, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${workout.formattedDate} • ${workout.formattedDuration}',
+                                style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 12),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                workout.summary,
+                                style: TextStyle(color: SoloLevelingTheme.primaryCyan, fontSize: 12),
+                              ),
+                              if (workout.muscleGroupsWorked.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 6,
+                                  children: workout.muscleGroupsWorked
+                                      .map((muscle) => Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: SoloLevelingTheme.backgroundCard,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              muscle.toUpperCase(),
+                                              style: const TextStyle(
+                                                color: SoloLevelingTheme.textMuted,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -93,8 +93,8 @@ class WorkoutSession extends HiveObject {
   }
 
   /// End the workout session
-  void endWorkout({String? sessionNotes}) {
-    endTime = DateTime.now();
+  void endWorkout({String? sessionNotes, DateTime? customEndTime}) {
+    endTime = customEndTime ?? DateTime.now();
     if (sessionNotes != null) {
       notes = sessionNotes;
     }

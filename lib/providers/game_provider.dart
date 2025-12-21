@@ -1133,8 +1133,8 @@ class GameProvider extends ChangeNotifier {
   }
 
   /// Start a new workout session
-  Future<WorkoutSession> startWorkout({String? name}) async {
-    final session = WorkoutSession(name: name);
+  Future<WorkoutSession> startWorkout({String? name, DateTime? startTime}) async {
+    final session = WorkoutSession(name: name, startTime: startTime);
     await _workoutSessionBox.put(session.id, session);
     _workoutSessions.add(session);
     _activeWorkout = session;
@@ -1232,11 +1232,67 @@ class GameProvider extends ChangeNotifier {
     _triggerAutoBackup();
   }
 
-  /// End the active workout
-  Future<void> endWorkout({String? notes}) async {
+  /// Update an existing set in the active workout
+  Future<void> updateSet({
+    required String setId,
+    required double weight,
+    required int reps,
+    bool? isPR,
+  }) async {
     if (_activeWorkout == null) return;
 
-    _activeWorkout!.endWorkout(sessionNotes: notes);
+    final setIndex = _activeWorkout!.sets.indexWhere((s) => s.id == setId);
+    if (setIndex < 0) return;
+
+    final set = _activeWorkout!.sets[setIndex];
+    set.weight = weight;
+    set.reps = reps;
+
+    if (isPR != null && isPR != set.isPR) {
+      if (isPR) {
+        set.isPR = true;
+        _activeWorkout!.totalPRs++;
+      } else {
+        set.isPR = false;
+        _activeWorkout!.totalPRs--;
+      }
+    }
+
+    _activeWorkout!.save();
+
+    // Update ghost data
+    final exercise = getExerciseById(set.exerciseId);
+    if (exercise != null) {
+      exercise.updateLastPerformance(weight, reps);
+    }
+
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Delete a set from the active workout
+  Future<void> deleteSet(String setId) async {
+    if (_activeWorkout == null) return;
+
+    final setIndex = _activeWorkout!.sets.indexWhere((s) => s.id == setId);
+    if (setIndex < 0) return;
+
+    final set = _activeWorkout!.sets[setIndex];
+    if (set.isPR) {
+      _activeWorkout!.totalPRs--;
+    }
+
+    _activeWorkout!.sets.removeAt(setIndex);
+    _activeWorkout!.save();
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// End the active workout
+  Future<void> endWorkout({String? notes, DateTime? endTime}) async {
+    if (_activeWorkout == null) return;
+
+    _activeWorkout!.endWorkout(sessionNotes: notes, customEndTime: endTime);
 
     // Award XP based on workout stats
     final xpReward = 10 + (_activeWorkout!.totalSets * 2) + (_activeWorkout!.totalPRs * 10);
