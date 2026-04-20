@@ -1331,6 +1331,36 @@ class GameProvider extends ChangeNotifier {
     return completed.take(10).toList();
   }
 
+  /// Get the sets from the most recent completed workout for this exercise.
+  /// Returns sets sorted by setNumber. Empty list if none.
+  List<WorkoutSet> getLastSessionSets(String exerciseId) {
+    final completed = _workoutSessions
+        .where((w) => !w.isActive && w.exerciseIds.contains(exerciseId))
+        .toList()
+      ..sort((a, b) => b.startTime.compareTo(a.startTime));
+    if (completed.isEmpty) return [];
+    final sets = completed.first.getSetsForExercise(exerciseId);
+    sets.sort((a, b) => a.setNumber.compareTo(b.setNumber));
+    return sets;
+  }
+
+  /// Add an exercise to the active workout without logging a set yet.
+  /// Used by inline logger so the card appears with an empty draft row.
+  Future<void> addExerciseToActiveWorkout(String exerciseId) async {
+    if (_activeWorkout == null) return;
+    if (_activeWorkout!.exerciseIds.contains(exerciseId)) return;
+
+    final exercise = getExerciseById(exerciseId);
+    if (exercise == null) return;
+
+    _activeWorkout!.exerciseIds.add(exercise.id);
+    if (!_activeWorkout!.muscleGroupsWorked.contains(exercise.muscleGroup)) {
+      _activeWorkout!.muscleGroupsWorked.add(exercise.muscleGroup);
+    }
+    await _activeWorkout!.save();
+    notifyListeners();
+  }
+
   /// Get last performance for an exercise (Ghost data)
   Map<String, dynamic>? getLastPerformance(String exerciseId) {
     final exercise = getExerciseById(exerciseId);

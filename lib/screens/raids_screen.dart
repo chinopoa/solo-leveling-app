@@ -21,7 +21,7 @@ class _RaidsScreenState extends State<RaidsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -59,6 +59,7 @@ class _RaidsScreenState extends State<RaidsScreen>
                 tabs: const [
                   Tab(text: 'RAIDS'),
                   Tab(text: 'TRAINING'),
+                  Tab(text: 'REGIMEN'),
                 ],
               ),
             ),
@@ -69,7 +70,8 @@ class _RaidsScreenState extends State<RaidsScreen>
                 controller: _tabController,
                 children: [
                   _buildRaidsTab(game),
-                  WorkoutScreen(habits: game.todayHabits, allHabits: game.habits, game: game),
+                  WorkoutScreen(showHabits: false, game: game),
+                  _buildRegimenTab(game),
                 ],
               ),
             ),
@@ -314,6 +316,416 @@ class _RaidsScreenState extends State<RaidsScreen>
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegimenTab(GameProvider game) {
+    final todayHabits = game.todayHabits;
+    final allHabits = game.habits;
+
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              if (todayHabits.isEmpty && allHabits.isEmpty)
+                _buildEmptyRegimenState()
+              else ...[
+                if (todayHabits.isNotEmpty)
+                  SystemWindow(
+                    title: '[TODAY\'S REGIMEN]',
+                    child: Column(
+                      children: todayHabits
+                          .map((habit) => _buildHabitRow(habit, game))
+                          .toList(),
+                    ),
+                  ),
+                if (allHabits.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SystemWindow(
+                    title: '[ALL HABITS]',
+                    child: Column(
+                      children: allHabits
+                          .map((habit) => _buildHabitDetailRow(habit, game))
+                          .toList(),
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 80), // Space for FAB
+            ],
+          ),
+        ),
+        // Add Habit FAB
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            onPressed: () => _showAddHabitDialog(context, game),
+            backgroundColor: SoloLevelingTheme.accentPurple,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyRegimenState() {
+    return SystemWindow(
+      title: '[NO HABITS]',
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          Icon(
+            Icons.repeat,
+            size: 48,
+            color: SoloLevelingTheme.textMuted,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Build your daily regimen',
+            style: TextStyle(
+              color: SoloLevelingTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap + to add your first habit',
+            style: TextStyle(
+              color: SoloLevelingTheme.accentPurple.withAlpha(179),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHabitRow(Habit habit, GameProvider game) {
+    final isCompleted = habit.isCompletedToday;
+
+    return InkWell(
+      onTap: () {
+        if (!isCompleted) {
+          game.completeHabit(habit.id);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: SoloLevelingTheme.textMuted.withAlpha(51),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCompleted
+                    ? SoloLevelingTheme.successGreen
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isCompleted
+                      ? SoloLevelingTheme.successGreen
+                      : SoloLevelingTheme.textMuted,
+                  width: 2,
+                ),
+              ),
+              child: isCompleted
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            if (habit.iconEmoji != null)
+              Text(habit.iconEmoji!, style: const TextStyle(fontSize: 20)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                habit.name,
+                style: TextStyle(
+                  color: isCompleted
+                      ? SoloLevelingTheme.textMuted
+                      : SoloLevelingTheme.textPrimary,
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (habit.currentStreak > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: SoloLevelingTheme.xpGold.withAlpha(51),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.local_fire_department,
+                      size: 14,
+                      color: SoloLevelingTheme.xpGold,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${habit.currentStreak}',
+                      style: const TextStyle(
+                        color: SoloLevelingTheme.xpGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHabitDetailRow(Habit habit, GameProvider game) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: SoloLevelingTheme.textMuted.withAlpha(51),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (habit.iconEmoji != null)
+            Text(habit.iconEmoji!, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  habit.name,
+                  style: const TextStyle(
+                    color: SoloLevelingTheme.textPrimary,
+                  ),
+                ),
+                if (habit.relatedStat != null)
+                  Text(
+                    habit.relatedStat!,
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.local_fire_department,
+                    size: 14,
+                    color: SoloLevelingTheme.xpGold,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${habit.currentStreak}',
+                    style: const TextStyle(
+                      color: SoloLevelingTheme.xpGold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                'Best: ${habit.longestStreak}',
+                style: TextStyle(
+                  color: SoloLevelingTheme.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 18),
+            color: SoloLevelingTheme.hpRed,
+            onPressed: () => _confirmDeleteHabit(context, habit, game),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddHabitDialog(BuildContext context, GameProvider game) {
+    final nameController = TextEditingController();
+    String selectedEmoji = '⚡';
+    String? selectedStat;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: SoloLevelingTheme.backgroundCard,
+          title: const Text(
+            '[NEW REGIMEN]',
+            style: TextStyle(
+              color: SoloLevelingTheme.accentPurple,
+              letterSpacing: 2,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Habit Name',
+                    labelStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Related Stat (optional)',
+                  style: TextStyle(
+                    color: SoloLevelingTheme.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: ['STR', 'AGI', 'VIT', 'INT', 'SEN']
+                      .map((stat) => GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedStat = selectedStat == stat ? null : stat;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: selectedStat == stat
+                                      ? SoloLevelingTheme.primaryCyan
+                                      : SoloLevelingTheme.textMuted,
+                                ),
+                                color: selectedStat == stat
+                                    ? SoloLevelingTheme.primaryCyan.withAlpha(51)
+                                    : null,
+                              ),
+                              child: Text(
+                                stat,
+                                style: TextStyle(
+                                  color: selectedStat == stat
+                                      ? SoloLevelingTheme.primaryCyan
+                                      : SoloLevelingTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  children: ['⚡', '🏋️', '📖', '🧘', '💊', '🌅', '✍️', '🎵']
+                      .map((e) => GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedEmoji = e;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: selectedEmoji == e
+                                      ? SoloLevelingTheme.accentPurple
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Text(e, style: const TextStyle(fontSize: 24)),
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (nameController.text.isNotEmpty) {
+                  final habit = Habit(
+                    name: nameController.text,
+                    iconEmoji: selectedEmoji,
+                    relatedStat: selectedStat,
+                  );
+                  game.addHabit(habit);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text(
+                'ADD REGIMEN',
+                style: TextStyle(color: SoloLevelingTheme.accentPurple),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteHabit(BuildContext context, Habit habit, GameProvider game) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text(
+          'Delete Habit?',
+          style: TextStyle(color: SoloLevelingTheme.hpRed),
+        ),
+        content: Text(
+          'Remove "${habit.name}" from your regimen?',
+          style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              game.deleteHabit(habit.id);
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'DELETE',
+              style: TextStyle(color: SoloLevelingTheme.hpRed),
+            ),
+          ),
         ],
       ),
     );

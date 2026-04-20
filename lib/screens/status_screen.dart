@@ -242,10 +242,10 @@ class StatusScreen extends StatelessWidget {
       children: [
         Expanded(
           child: _QuickStatCard(
-            icon: Icons.monetization_on,
-            label: 'GOLD',
-            value: player.gold.toString(),
-            color: Colors.amber,
+            icon: Icons.fitness_center,
+            label: 'WORKOUTS',
+            value: game.workoutSessions.where((w) => !w.isActive).length.toString(),
+            color: SoloLevelingTheme.primaryCyan,
           ),
         ),
         const SizedBox(width: 12),

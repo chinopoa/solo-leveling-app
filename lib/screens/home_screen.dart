@@ -25,16 +25,16 @@ class _HomeScreenState extends State<HomeScreen> {
     StatusScreen(),
     DailyQuestScreen(),
     QuestsScreen(),
-    HunterScreen(),
     RaidsScreen(),
+    HunterScreen(),
   ];
 
   final List<String> _titles = const [
     'STATUS',
     'DAILY QUEST',
     'QUESTS',
-    'HUNTER',
     'RAIDS',
+    'HUNTER',
   ];
 
   @override
@@ -90,12 +90,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: 'Quests',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.shield),
-                      label: 'Hunter',
-                    ),
-                    BottomNavigationBarItem(
                       icon: Icon(Icons.flag),
                       label: 'Raids',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.shield),
+                      label: 'Hunter',
                     ),
                   ],
                 ),
