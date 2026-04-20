@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
@@ -254,7 +257,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           const SizedBox(height: 16),
 
           // Exercise List
-          ...filteredExercises.map((exercise) => _buildExerciseCard(exercise, game)),
+          SlidableAutoCloseBehavior(
+            child: Column(
+              children: filteredExercises
+                  .map((exercise) => _buildExerciseCard(exercise, game))
+                  .toList(),
+            ),
+          ),
 
           if (filteredExercises.isEmpty)
             Container(
@@ -552,88 +561,327 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         color: SoloLevelingTheme.backgroundCard,
         border: Border.all(color: SoloLevelingTheme.textMuted.withValues(alpha: 0.2)),
       ),
-      child: InkWell(
-        onTap: () => _showExerciseDetail(context, exercise, game),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Icon
-              Text(
-                exercise.iconEmoji ?? '🏋️',
-                style: const TextStyle(fontSize: 24),
-              ),
-              const SizedBox(width: 12),
-
-              // Exercise Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            exercise.name,
-                            style: const TextStyle(
-                              color: SoloLevelingTheme.textPrimary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: rankColor.withValues(alpha: 0.2),
-                            border: Border.all(color: rankColor),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            exercise.rank,
-                            style: TextStyle(
-                              color: rankColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      exercise.muscleGroupDisplay,
-                      style: TextStyle(
-                        color: SoloLevelingTheme.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                    if (exercise.currentPRWeight != null) ...[
-                      const SizedBox(height: 4),
+      child: Slidable(
+        key: ValueKey('skill-${exercise.id}'),
+        groupTag: 'skill-book',
+        endActionPane: ActionPane(
+          motion: const BehindMotion(),
+          extentRatio: 0.5,
+          children: [
+            SlidableAction(
+              onPressed: (_) => _showEditExerciseDialog(context, exercise, game),
+              backgroundColor: SoloLevelingTheme.backgroundElevated,
+              foregroundColor: SoloLevelingTheme.primaryCyan,
+              icon: Icons.edit,
+              label: 'Edit',
+            ),
+            SlidableAction(
+              onPressed: (_) => _confirmDeleteExercise(context, exercise, game),
+              backgroundColor: SoloLevelingTheme.hpRed,
+              foregroundColor: Colors.white,
+              icon: Icons.delete,
+              label: 'Delete',
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: () => _showExerciseDetail(context, exercise, game),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Text(
+                  exercise.iconEmoji ?? '🏋️',
+                  style: const TextStyle(fontSize: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
                         children: [
-                          const Icon(Icons.emoji_events, color: Colors.amber, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            'PR: ${exercise.formattedPR}',
-                            style: const TextStyle(
-                              color: Colors.amber,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Text(
+                              exercise.name,
+                              style: const TextStyle(
+                                color: SoloLevelingTheme.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: rankColor.withValues(alpha: 0.2),
+                              border: Border.all(color: rankColor),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              exercise.rank,
+                              style: TextStyle(
+                                color: rankColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        exercise.muscleGroupDisplay,
+                        style: const TextStyle(
+                          color: SoloLevelingTheme.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (exercise.currentPRWeight != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.emoji_events, color: Colors.amber, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              'PR: ${exercise.formattedPR}',
+                              style: const TextStyle(
+                                color: Colors.amber,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-
-              // Arrow
-              const Icon(Icons.chevron_right, color: SoloLevelingTheme.textMuted),
-            ],
+                Icon(
+                  Icons.swipe_left,
+                  color: SoloLevelingTheme.textMuted.withValues(alpha: 0.4),
+                  size: 16,
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showEditExerciseDialog(BuildContext context, Exercise exercise, GameProvider game) {
+    final nameController = TextEditingController(text: exercise.name);
+    String selectedMuscleGroup = exercise.muscleGroup;
+    String? selectedArmSubGroup = exercise.armSubGroup;
+    String selectedEmoji = exercise.iconEmoji ?? '🏋️';
+    final emojis = ['🏋️', '💪', '🦵', '🦴', '🏃', '🔥', '⚡', '🎯', '🦋', '🚣', '⬇️', '🧗'];
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: SoloLevelingTheme.backgroundCard,
+          title: const Text('Edit Exercise', style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Exercise Name',
+                    labelStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Muscle Group', style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 12)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _muscleGroups.map((group) => GestureDetector(
+                        onTap: () => setState(() {
+                          selectedMuscleGroup = group['name'];
+                          if (group['name'] != 'arms') selectedArmSubGroup = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: selectedMuscleGroup == group['name']
+                                ? SoloLevelingTheme.primaryCyan.withValues(alpha: 0.2)
+                                : SoloLevelingTheme.backgroundDark,
+                            border: Border.all(
+                              color: selectedMuscleGroup == group['name']
+                                  ? SoloLevelingTheme.primaryCyan
+                                  : SoloLevelingTheme.textMuted.withValues(alpha: 0.3),
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            group['label'],
+                            style: TextStyle(
+                              color: selectedMuscleGroup == group['name']
+                                  ? SoloLevelingTheme.primaryCyan
+                                  : SoloLevelingTheme.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      )).toList(),
+                ),
+                if (selectedMuscleGroup == 'arms') ...[
+                  const SizedBox(height: 12),
+                  const Text('Arm Sub-group', style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _armSubGroups.map((sub) => GestureDetector(
+                          onTap: () => setState(() => selectedArmSubGroup = sub['name']),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: selectedArmSubGroup == sub['name']
+                                  ? SoloLevelingTheme.primaryCyan.withValues(alpha: 0.2)
+                                  : SoloLevelingTheme.backgroundDark,
+                              border: Border.all(
+                                color: selectedArmSubGroup == sub['name']
+                                    ? SoloLevelingTheme.primaryCyan
+                                    : SoloLevelingTheme.textMuted.withValues(alpha: 0.3),
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              sub['label'],
+                              style: TextStyle(
+                                color: selectedArmSubGroup == sub['name']
+                                    ? SoloLevelingTheme.primaryCyan
+                                    : SoloLevelingTheme.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        )).toList(),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                const Text('Icon', style: TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 12)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: emojis.map((emoji) => GestureDetector(
+                        onTap: () => setState(() => selectedEmoji = emoji),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: selectedEmoji == emoji
+                                ? SoloLevelingTheme.primaryCyan.withValues(alpha: 0.2)
+                                : SoloLevelingTheme.backgroundDark,
+                            border: Border.all(
+                              color: selectedEmoji == emoji
+                                  ? SoloLevelingTheme.primaryCyan
+                                  : SoloLevelingTheme.textMuted.withValues(alpha: 0.3),
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(emoji, style: const TextStyle(fontSize: 20)),
+                        ),
+                      )).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: SoloLevelingTheme.textMuted)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.trim().isEmpty) return;
+                exercise.name = nameController.text.trim();
+                exercise.muscleGroup = selectedMuscleGroup;
+                exercise.armSubGroup = selectedMuscleGroup == 'arms' ? selectedArmSubGroup : null;
+                exercise.iconEmoji = selectedEmoji;
+                await game.updateExercise(exercise);
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: SoloLevelingTheme.primaryCyan,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('SAVE'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmRemoveExerciseFromWorkout(
+      BuildContext context, Exercise exercise, GameProvider game) async {
+    final removedSets =
+        await game.removeExerciseFromActiveWorkout(exercise.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            removedSets.isEmpty
+                ? '${exercise.name} removed'
+                : '${exercise.name} removed (${removedSets.length} set${removedSets.length == 1 ? '' : 's'})',
+          ),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'UNDO',
+            textColor: SoloLevelingTheme.primaryCyan,
+            onPressed: () => removedSets.isEmpty
+                ? game.addExerciseToActiveWorkout(exercise.id)
+                : game.restoreSetsToActiveWorkout(exercise.id, removedSets),
+          ),
+        ),
+      );
+  }
+
+  void _confirmDeleteExercise(BuildContext context, Exercise exercise, GameProvider game) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text('Delete Exercise?', style: TextStyle(color: SoloLevelingTheme.hpRed)),
+        content: Text(
+          'Permanently delete "${exercise.name}" from the Skill Book? Past workout records will keep their entries.',
+          style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: SoloLevelingTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await game.deleteExercise(exercise.id);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${exercise.name} deleted'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SoloLevelingTheme.hpRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('DELETE'),
+          ),
+        ],
       ),
     );
   }
@@ -730,8 +978,26 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                       committedSets: sets,
                       previousSets: previousSets,
                       game: game,
-                      onEditSet: (set) => _showEditSetDialog(context, set, game),
-                      onDeleteSet: (set) => _showDeleteSetDialog(context, set, game),
+                      onViewHistory: () => _showExerciseDetail(context, exercise, game),
+                      onRemoveExercise: () =>
+                          _confirmRemoveExerciseFromWorkout(context, exercise, game),
+                      onSetDeleted: (deletedSet) {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Set deleted from ${exercise.name}',
+                              ),
+                              duration: const Duration(seconds: 4),
+                              action: SnackBarAction(
+                                label: 'UNDO',
+                                textColor: SoloLevelingTheme.primaryCyan,
+                                onPressed: () => game.restoreSet(deletedSet),
+                              ),
+                            ),
+                          );
+                      },
                     );
                   },
                 ),
@@ -1689,15 +1955,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 }
 
 /// Inline exercise card used during an active workout.
-/// Shows committed sets with delta vs previous session, plus a draft row
-/// for fast logging without modal dialogs.
+/// Two-line committed rows (swipe to delete) with delta vs previous session,
+/// a distinct draft section with large inputs and a full-width LOG SET button,
+/// optional rest timer chip, and a header menu for exercise-level actions.
 class _InlineExerciseCard extends StatefulWidget {
   final Exercise exercise;
   final List<WorkoutSet> committedSets;
   final List<WorkoutSet> previousSets;
   final GameProvider game;
-  final void Function(WorkoutSet set) onEditSet;
-  final void Function(WorkoutSet set) onDeleteSet;
+  final VoidCallback onViewHistory;
+  final VoidCallback onRemoveExercise;
+  final void Function(WorkoutSet deletedSet) onSetDeleted;
 
   const _InlineExerciseCard({
     super.key,
@@ -1705,8 +1973,9 @@ class _InlineExerciseCard extends StatefulWidget {
     required this.committedSets,
     required this.previousSets,
     required this.game,
-    required this.onEditSet,
-    required this.onDeleteSet,
+    required this.onViewHistory,
+    required this.onRemoveExercise,
+    required this.onSetDeleted,
   });
 
   @override
@@ -1714,11 +1983,16 @@ class _InlineExerciseCard extends StatefulWidget {
 }
 
 class _InlineExerciseCardState extends State<_InlineExerciseCard> {
+  static const int _defaultRestSeconds = 90;
+
   final TextEditingController _weightCtrl = TextEditingController();
   final TextEditingController _repsCtrl = TextEditingController();
   final FocusNode _weightFocus = FocusNode();
   final FocusNode _repsFocus = FocusNode();
   bool _committing = false;
+
+  Timer? _restTimer;
+  int _restRemaining = 0;
 
   @override
   void initState() {
@@ -1729,7 +2003,6 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
   @override
   void didUpdateWidget(covariant _InlineExerciseCard old) {
     super.didUpdateWidget(old);
-    // After a new set is committed, refresh the draft prefill
     if (widget.committedSets.length != old.committedSets.length) {
       _seedDraftFromContext();
     }
@@ -1737,6 +2010,7 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
 
   @override
   void dispose() {
+    _restTimer?.cancel();
     _weightCtrl.dispose();
     _repsCtrl.dispose();
     _weightFocus.dispose();
@@ -1744,10 +2018,6 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
     super.dispose();
   }
 
-  /// Prefill the draft inputs with the most useful suggestion:
-  /// 1. Last committed set in this session (fastest progression)
-  /// 2. Same-position set from previous session
-  /// 3. Last set from previous session
   void _seedDraftFromContext() {
     final lastCommitted = widget.committedSets.isNotEmpty
         ? widget.committedSets.last
@@ -1769,8 +2039,30 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
     }
   }
 
-  String _formatWeight(double w) {
-    return w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
+  String _formatWeight(double w) =>
+      w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
+
+  void _startRestTimer() {
+    _restTimer?.cancel();
+    setState(() => _restRemaining = _defaultRestSeconds);
+    _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_restRemaining <= 1) {
+        t.cancel();
+        HapticFeedback.mediumImpact();
+        setState(() => _restRemaining = 0);
+      } else {
+        setState(() => _restRemaining--);
+      }
+    });
+  }
+
+  void _stopRestTimer() {
+    _restTimer?.cancel();
+    setState(() => _restRemaining = 0);
   }
 
   Future<void> _commitDraft() async {
@@ -1778,16 +2070,18 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
     final weight = double.tryParse(_weightCtrl.text.trim());
     final reps = int.tryParse(_repsCtrl.text.trim());
     if (weight == null || reps == null || reps <= 0 || weight < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter weight and reps'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('Enter a valid weight and rep count'),
+          duration: Duration(seconds: 2),
+        ));
       return;
     }
     setState(() => _committing = true);
     final isPR = widget.exercise.isNewPR(weight, reps);
+    HapticFeedback.lightImpact();
     await widget.game.addSetToWorkout(
       exerciseId: widget.exercise.id,
       weight: weight,
@@ -1796,8 +2090,26 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
     );
     if (!mounted) return;
     setState(() => _committing = false);
-    // Move focus back to weight for the next set
-    FocusScope.of(context).requestFocus(_weightFocus);
+    _startRestTimer();
+    FocusScope.of(context).unfocus();
+  }
+
+  Future<void> _deleteSet(WorkoutSet set) async {
+    final removed = WorkoutSet(
+      id: set.id,
+      exerciseId: set.exerciseId,
+      exerciseName: set.exerciseName,
+      weight: set.weight,
+      reps: set.reps,
+      isPR: set.isPR,
+      timestamp: set.timestamp,
+      note: set.note,
+      setNumber: set.setNumber,
+    );
+    HapticFeedback.mediumImpact();
+    await widget.game.deleteSet(set.id);
+    if (!mounted) return;
+    widget.onSetDeleted(removed);
   }
 
   @override
@@ -1805,10 +2117,10 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
     final exercise = widget.exercise;
     final committed = widget.committedSets;
     final previous = widget.previousSets;
-    final nextSetNumber = committed.length + 1;
     final samePosPrev = committed.length < previous.length
         ? previous[committed.length]
         : null;
+    final rankColor = _rankColor(exercise.rank);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1819,186 +2131,424 @@ class _InlineExerciseCardState extends State<_InlineExerciseCard> {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 8),
-            child: Row(
-              children: [
-                Text(exercise.iconEmoji ?? '🏋️',
-                    style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        exercise.name,
-                        style: const TextStyle(
-                          color: SoloLevelingTheme.textPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (previous.isNotEmpty)
-                        Text(
-                          'Last session: ${previous.length} set${previous.length > 1 ? 's' : ''}',
-                          style: const TextStyle(
-                            color: SoloLevelingTheme.textMuted,
-                            fontSize: 11,
-                          ),
-                        )
-                      else
-                        const Text(
-                          'First time logging',
-                          style: TextStyle(
-                            color: SoloLevelingTheme.textMuted,
-                            fontSize: 11,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+          _buildHeader(exercise, rankColor, committed, previous),
+          if (committed.isEmpty) _buildEmptyState(previous),
+          if (committed.isNotEmpty)
+            SlidableAutoCloseBehavior(
+              child: Column(
+                children: [
+                  for (int i = 0; i < committed.length; i++)
+                    _buildCommittedRow(
+                      committed[i],
+                      i < previous.length ? previous[i] : null,
+                    ),
+                ],
+              ),
             ),
-          ),
-
-          // Column headers
-          _buildColumnHeaders(),
-
-          // Committed sets
-          ...committed.asMap().entries.map((entry) {
-            final i = entry.key;
-            final set = entry.value;
-            final prev = i < previous.length ? previous[i] : null;
-            return _CommittedSetRow(
-              set: set,
-              previous: prev,
-              onTap: () => widget.onEditSet(set),
-              onLongPress: () => widget.onDeleteSet(set),
-              onTogglePR: () => widget.game.toggleSetPR(set.id, !set.isPR),
-            );
-          }),
-
-          // Draft row
-          _buildDraftRow(nextSetNumber, samePosPrev),
+          if (_restRemaining > 0) _buildRestTimer(),
+          _buildDraftSection(committed.length + 1, samePosPrev, previous),
         ],
       ),
     );
   }
 
-  Widget _buildColumnHeaders() {
+  Widget _buildHeader(
+    Exercise exercise,
+    Color rankColor,
+    List<WorkoutSet> committed,
+    List<WorkoutSet> previous,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
       decoration: BoxDecoration(
-        color: SoloLevelingTheme.backgroundDark.withValues(alpha: 0.4),
         border: Border(
-          top: BorderSide(
-            color: SoloLevelingTheme.textMuted.withValues(alpha: 0.15),
-          ),
           bottom: BorderSide(
             color: SoloLevelingTheme.textMuted.withValues(alpha: 0.15),
           ),
         ),
       ),
       child: Row(
-        children: const [
-          SizedBox(width: 28, child: _HeaderLabel('SET')),
-          SizedBox(width: 8),
-          Expanded(flex: 3, child: _HeaderLabel('PREVIOUS')),
-          Expanded(flex: 2, child: _HeaderLabel('KG', center: true)),
-          Expanded(flex: 2, child: _HeaderLabel('REPS', center: true)),
-          SizedBox(width: 44),
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: SoloLevelingTheme.backgroundDark,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: rankColor.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Text(exercise.iconEmoji ?? '🏋️',
+                style: const TextStyle(fontSize: 22)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.name,
+                  style: const TextStyle(
+                    color: SoloLevelingTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    _Pill(
+                      label: 'RANK ${exercise.rank}',
+                      color: rankColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      exercise.muscleGroupDisplay,
+                      style: const TextStyle(
+                        color: SoloLevelingTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (committed.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '· ${committed.length} set${committed.length == 1 ? '' : 's'}',
+                        style: const TextStyle(
+                          color: SoloLevelingTheme.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(
+              Icons.more_vert,
+              color: SoloLevelingTheme.textMuted,
+            ),
+            color: SoloLevelingTheme.backgroundElevated,
+            onSelected: (val) {
+              switch (val) {
+                case 'history':
+                  widget.onViewHistory();
+                  break;
+                case 'remove':
+                  widget.onRemoveExercise();
+                  break;
+                case 'rest':
+                  if (_restRemaining > 0) {
+                    _stopRestTimer();
+                  } else {
+                    _startRestTimer();
+                  }
+                  break;
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'history',
+                child: Row(children: [
+                  Icon(Icons.show_chart,
+                      color: SoloLevelingTheme.primaryCyan, size: 18),
+                  SizedBox(width: 8),
+                  Text('View history',
+                      style: TextStyle(color: SoloLevelingTheme.textPrimary)),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'rest',
+                child: Row(children: [
+                  const Icon(Icons.timer,
+                      color: SoloLevelingTheme.primaryCyan, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    _restRemaining > 0 ? 'Stop rest timer' : 'Start rest timer',
+                    style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+                  ),
+                ]),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'remove',
+                child: Row(children: [
+                  Icon(Icons.delete_outline,
+                      color: SoloLevelingTheme.hpRed, size: 18),
+                  SizedBox(width: 8),
+                  Text('Remove from workout',
+                      style: TextStyle(color: SoloLevelingTheme.hpRed)),
+                ]),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDraftRow(int setNumber, WorkoutSet? prev) {
-    final prevText = prev != null
-        ? '${_formatWeight(prev.weight)} × ${prev.reps}'
-        : '—';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.15),
-          ),
-        ),
-      ),
+  Widget _buildEmptyState(List<WorkoutSet> previous) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Row(
         children: [
-          _SetNumberChip(number: setNumber, draft: true),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 3,
-            child: Text(
-              prevText,
-              style: const TextStyle(
-                color: SoloLevelingTheme.textMuted,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: _NumericField(
-              controller: _weightCtrl,
-              focusNode: _weightFocus,
-              hint: prev != null ? _formatWeight(prev.weight) : '0',
-              decimal: true,
-              textInputAction: TextInputAction.next,
-              onSubmitted: (_) =>
-                  FocusScope.of(context).requestFocus(_repsFocus),
-            ),
-          ),
+          const Icon(Icons.lightbulb_outline,
+              size: 14, color: SoloLevelingTheme.textMuted),
           const SizedBox(width: 6),
           Expanded(
-            flex: 2,
-            child: _NumericField(
-              controller: _repsCtrl,
-              focusNode: _repsFocus,
-              hint: prev != null ? prev.reps.toString() : '0',
-              decimal: false,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _commitDraft(),
-            ),
-          ),
-          SizedBox(
-            width: 44,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              onPressed: _committing ? null : _commitDraft,
-              icon: Icon(
-                Icons.check_circle,
-                color: _committing
-                    ? SoloLevelingTheme.textMuted
-                    : SoloLevelingTheme.primaryCyan,
-                size: 28,
+            child: Text(
+              previous.isEmpty
+                  ? 'No previous data — log your first set below.'
+                  : 'Last session: ${previous.length} set${previous.length == 1 ? '' : 's'}. Match it or beat it.',
+              style: const TextStyle(
+                color: SoloLevelingTheme.textMuted,
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
               ),
-              tooltip: 'Log set',
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildCommittedRow(WorkoutSet set, WorkoutSet? prev) {
+    return Slidable(
+      key: ValueKey('set-${set.id}'),
+      groupTag: 'sets-${widget.exercise.id}',
+      endActionPane: ActionPane(
+        motion: const BehindMotion(),
+        extentRatio: 0.25,
+        children: [
+          SlidableAction(
+            onPressed: (_) => _deleteSet(set),
+            backgroundColor: SoloLevelingTheme.hpRed,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Delete',
+          ),
+        ],
+      ),
+      child: _CommittedSetRow(
+        set: set,
+        previous: prev,
+        onTogglePR: () {
+          HapticFeedback.selectionClick();
+          widget.game.toggleSetPR(set.id, !set.isPR);
+        },
+      ),
+    );
+  }
+
+  Widget _buildRestTimer() {
+    final mins = _restRemaining ~/ 60;
+    final secs = _restRemaining % 60;
+    final text = mins > 0
+        ? '$mins:${secs.toString().padLeft(2, '0')}'
+        : '${secs}s';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: SoloLevelingTheme.accentPurple.withValues(alpha: 0.12),
+        border: Border(
+          top: BorderSide(
+            color: SoloLevelingTheme.accentPurple.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt,
+              color: SoloLevelingTheme.accentPurple, size: 16),
+          const SizedBox(width: 6),
+          const Text(
+            'MANA REGEN',
+            style: TextStyle(
+              color: SoloLevelingTheme.accentPurple,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+              color: SoloLevelingTheme.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: _stopRestTimer,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                'SKIP',
+                style: TextStyle(
+                  color: SoloLevelingTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDraftSection(int setNumber, WorkoutSet? samePosPrev,
+      List<WorkoutSet> allPrevious) {
+    final hintWeight = samePosPrev != null
+        ? _formatWeight(samePosPrev.weight)
+        : (allPrevious.isNotEmpty ? _formatWeight(allPrevious.last.weight) : '0');
+    final hintReps = samePosPrev != null
+        ? samePosPrev.reps.toString()
+        : (allPrevious.isNotEmpty ? allPrevious.last.reps.toString() : '0');
+    final prevText = samePosPrev != null
+        ? '${_formatWeight(samePosPrev.weight)}kg × ${samePosPrev.reps}'
+        : (allPrevious.isNotEmpty
+            ? '${_formatWeight(allPrevious.last.weight)}kg × ${allPrevious.last.reps}'
+            : 'no data');
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.05),
+        border: Border(
+          top: BorderSide(
+            color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'NEXT · SET $setNumber',
+                  style: const TextStyle(
+                    color: SoloLevelingTheme.primaryCyan,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Previous: $prevText',
+                style: const TextStyle(
+                  color: SoloLevelingTheme.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _DraftField(
+                  controller: _weightCtrl,
+                  focusNode: _weightFocus,
+                  label: 'KG',
+                  hint: hintWeight,
+                  decimal: true,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) =>
+                      FocusScope.of(context).requestFocus(_repsFocus),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DraftField(
+                  controller: _repsCtrl,
+                  focusNode: _repsFocus,
+                  label: 'REPS',
+                  hint: hintReps,
+                  decimal: false,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _commitDraft(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _committing ? null : _commitDraft,
+            icon: _committing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  )
+                : const Icon(Icons.bolt, size: 18),
+            label: Text(_committing ? 'LOGGING…' : 'LOG SET $setNumber'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SoloLevelingTheme.primaryCyan,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.4,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _rankColor(String rank) {
+    switch (rank.toUpperCase()) {
+      case 'S':
+        return Colors.amber;
+      case 'A':
+        return Colors.purple;
+      case 'B':
+        return Colors.blue;
+      case 'C':
+        return Colors.green;
+      case 'D':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 }
 
 class _CommittedSetRow extends StatelessWidget {
   final WorkoutSet set;
   final WorkoutSet? previous;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
   final VoidCallback onTogglePR;
 
   const _CommittedSetRow({
     required this.set,
     required this.previous,
-    required this.onTap,
-    required this.onLongPress,
     required this.onTogglePR,
   });
 
@@ -2007,95 +2557,156 @@ class _CommittedSetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prevText = previous != null
-        ? '${_fmt(previous!.weight)} × ${previous!.reps}'
-        : '—';
-
     final delta = _computeDelta();
+    final isPR = set.isPR;
 
-    return InkWell(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: set.isPR ? Colors.amber.withValues(alpha: 0.08) : null,
-          border: Border(
-            top: BorderSide(
-              color: SoloLevelingTheme.textMuted.withValues(alpha: 0.08),
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isPR ? Colors.amber.withValues(alpha: 0.06) : null,
+        border: Border(
+          top: BorderSide(
+            color: SoloLevelingTheme.textMuted.withValues(alpha: 0.08),
           ),
         ),
-        child: Row(
-          children: [
-            _SetNumberChip(number: set.setNumber, draft: false, isPR: set.isPR),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 3,
-              child: Text(
-                prevText,
-                style: const TextStyle(
-                  color: SoloLevelingTheme.textMuted,
-                  fontSize: 12,
-                ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: SoloLevelingTheme.backgroundDark,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: (isPR ? Colors.amber : SoloLevelingTheme.textMuted)
+                    .withValues(alpha: 0.4),
               ),
             ),
-            Expanded(
-              flex: 2,
-              child: Text(
-                _fmt(set.weight),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: set.isPR
-                      ? Colors.amber
-                      : SoloLevelingTheme.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
+            child: Text(
+              '${set.setNumber}',
+              style: TextStyle(
+                color: isPR ? Colors.amber : SoloLevelingTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            Expanded(
-              flex: 2,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${set.reps}',
-                    style: TextStyle(
-                      color: set.isPR
-                          ? Colors.amber
-                          : SoloLevelingTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (delta != null) ...[
-                    const SizedBox(width: 6),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
                     Text(
-                      delta.text,
+                      _fmt(set.weight),
                       style: TextStyle(
-                        color: delta.color,
-                        fontSize: 10,
+                        color: isPR
+                            ? Colors.amber
+                            : SoloLevelingTheme.textPrimary,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Text(
+                      'kg',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '×',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textMuted,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${set.reps}',
+                      style: TextStyle(
+                        color: isPR
+                            ? Colors.amber
+                            : SoloLevelingTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Text(
+                      'reps',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textMuted,
+                        fontSize: 11,
                       ),
                     ),
                   ],
-                ],
-              ),
-            ),
-            SizedBox(
-              width: 44,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                onPressed: onTogglePR,
-                icon: Icon(
-                  set.isPR ? Icons.emoji_events : Icons.emoji_events_outlined,
-                  color: set.isPR ? Colors.amber : SoloLevelingTheme.textMuted,
-                  size: 20,
                 ),
-                tooltip: set.isPR ? 'Unmark PR' : 'Mark PR',
-              ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    if (previous != null)
+                      Text(
+                        'prev: ${_fmt(previous!.weight)}×${previous!.reps}',
+                        style: const TextStyle(
+                          color: SoloLevelingTheme.textMuted,
+                          fontSize: 10,
+                        ),
+                      )
+                    else
+                      const Text(
+                        'first time',
+                        style: TextStyle(
+                          color: SoloLevelingTheme.textMuted,
+                          fontSize: 10,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    if (delta != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: delta.color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          delta.text,
+                          style: TextStyle(
+                            color: delta.color,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            onPressed: onTogglePR,
+            icon: Icon(
+              isPR ? Icons.emoji_events : Icons.emoji_events_outlined,
+              color: isPR ? Colors.amber : SoloLevelingTheme.textMuted,
+              size: 22,
+            ),
+            tooltip: isPR ? 'Unmark PR' : 'Mark PR',
+          ),
+        ],
       ),
     );
   }
@@ -2111,7 +2722,9 @@ class _CommittedSetRow extends StatelessWidget {
     final prevVol = previous!.weight * previous!.reps;
     final color = curVol > prevVol
         ? SoloLevelingTheme.successGreen
-        : (curVol < prevVol ? SoloLevelingTheme.hpRed : SoloLevelingTheme.textMuted);
+        : (curVol < prevVol
+            ? SoloLevelingTheme.hpRed
+            : SoloLevelingTheme.textMuted);
     final parts = <String>[];
     if (wDelta != 0) {
       final sign = wDelta > 0 ? '+' : '';
@@ -2122,9 +2735,10 @@ class _CommittedSetRow extends StatelessWidget {
     }
     if (rDelta != 0) {
       final sign = rDelta > 0 ? '+' : '';
-      parts.add('${sign}${rDelta}r');
+      parts.add('$sign${rDelta}r');
     }
-    final arrow = curVol > prevVol ? '▲' : (curVol < prevVol ? '▼' : '•');
+    final arrow =
+        curVol > prevVol ? '▲' : (curVol < prevVol ? '▼' : '•');
     return _Delta('$arrow ${parts.join(' ')}', color);
   }
 }
@@ -2135,70 +2749,46 @@ class _Delta {
   _Delta(this.text, this.color);
 }
 
-class _SetNumberChip extends StatelessWidget {
-  final int number;
-  final bool draft;
-  final bool isPR;
-
-  const _SetNumberChip({
-    required this.number,
-    required this.draft,
-    this.isPR = false,
-  });
+class _Pill extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Pill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final color = isPR
-        ? Colors.amber
-        : (draft ? SoloLevelingTheme.primaryCyan : SoloLevelingTheme.textMuted);
     return Container(
-      width: 28,
-      height: 24,
-      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: SoloLevelingTheme.backgroundDark,
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-        borderRadius: BorderRadius.circular(4),
+        color: color.withValues(alpha: 0.18),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(3),
       ),
       child: Text(
-        '$number',
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }
 }
 
-class _HeaderLabel extends StatelessWidget {
-  final String text;
-  final bool center;
-  const _HeaderLabel(this.text, {this.center = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      textAlign: center ? TextAlign.center : TextAlign.start,
-      style: const TextStyle(
-        color: SoloLevelingTheme.textMuted,
-        fontSize: 10,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.2,
-      ),
-    );
-  }
-}
-
-class _NumericField extends StatelessWidget {
+class _DraftField extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
+  final String label;
   final String hint;
   final bool decimal;
   final TextInputAction textInputAction;
   final ValueChanged<String> onSubmitted;
 
-  const _NumericField({
+  const _DraftField({
     required this.controller,
     required this.focusNode,
+    required this.label,
     required this.hint,
     required this.decimal,
     required this.textInputAction,
@@ -2207,39 +2797,58 @@ class _NumericField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 36,
-      decoration: BoxDecoration(
-        color: SoloLevelingTheme.backgroundDark,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.25),
-        ),
-      ),
-      alignment: Alignment.center,
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-        textAlign: TextAlign.center,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        style: const TextStyle(
-          color: SoloLevelingTheme.textPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-        ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: SoloLevelingTheme.textMuted.withValues(alpha: 0.5),
-            fontWeight: FontWeight.normal,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: SoloLevelingTheme.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
           ),
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
         ),
-      ),
+        Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: SoloLevelingTheme.backgroundDark,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+            textAlign: TextAlign.center,
+            textInputAction: textInputAction,
+            onSubmitted: onSubmitted,
+            style: const TextStyle(
+              color: SoloLevelingTheme.textPrimary,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                color: SoloLevelingTheme.textMuted.withValues(alpha: 0.45),
+                fontWeight: FontWeight.normal,
+              ),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

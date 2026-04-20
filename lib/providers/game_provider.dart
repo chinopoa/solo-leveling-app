@@ -1361,6 +1361,66 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Remove an exercise (and all its sets) from the active workout.
+  /// Returns the removed sets so the UI can offer Undo.
+  Future<List<WorkoutSet>> removeExerciseFromActiveWorkout(String exerciseId) async {
+    if (_activeWorkout == null) return const [];
+    final removedSets = _activeWorkout!.getSetsForExercise(exerciseId);
+    final removedPRs = removedSets.where((s) => s.isPR).length;
+    _activeWorkout!.sets.removeWhere((s) => s.exerciseId == exerciseId);
+    _activeWorkout!.exerciseIds.remove(exerciseId);
+    _activeWorkout!.totalPRs -= removedPRs;
+
+    // Recompute muscle groups worked from remaining sets
+    final remainingMuscles = <String>{};
+    for (final id in _activeWorkout!.exerciseIds) {
+      final ex = getExerciseById(id);
+      if (ex != null) remainingMuscles.add(ex.muscleGroup);
+    }
+    _activeWorkout!.muscleGroupsWorked
+      ..clear()
+      ..addAll(remainingMuscles);
+
+    await _activeWorkout!.save();
+    notifyListeners();
+    _triggerAutoBackup();
+    return removedSets;
+  }
+
+  /// Restore previously removed sets to the active workout (for Undo).
+  Future<void> restoreSetsToActiveWorkout(
+    String exerciseId,
+    List<WorkoutSet> sets,
+  ) async {
+    if (_activeWorkout == null || sets.isEmpty) return;
+    if (!_activeWorkout!.exerciseIds.contains(exerciseId)) {
+      _activeWorkout!.exerciseIds.add(exerciseId);
+      final ex = getExerciseById(exerciseId);
+      if (ex != null &&
+          !_activeWorkout!.muscleGroupsWorked.contains(ex.muscleGroup)) {
+        _activeWorkout!.muscleGroupsWorked.add(ex.muscleGroup);
+      }
+    }
+    for (final s in sets) {
+      _activeWorkout!.sets.add(s);
+      if (s.isPR) _activeWorkout!.totalPRs++;
+    }
+    await _activeWorkout!.save();
+    notifyListeners();
+  }
+
+  /// Restore a single deleted set (for Undo).
+  Future<void> restoreSet(WorkoutSet set) async {
+    if (_activeWorkout == null) return;
+    _activeWorkout!.sets.add(set);
+    if (set.isPR) _activeWorkout!.totalPRs++;
+    if (!_activeWorkout!.exerciseIds.contains(set.exerciseId)) {
+      _activeWorkout!.exerciseIds.add(set.exerciseId);
+    }
+    await _activeWorkout!.save();
+    notifyListeners();
+  }
+
   /// Get last performance for an exercise (Ghost data)
   Map<String, dynamic>? getLastPerformance(String exerciseId) {
     final exercise = getExerciseById(exerciseId);

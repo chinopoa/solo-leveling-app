@@ -15,14 +15,17 @@ Cheat sheet for shipping a new IPA via Codemagic. Read top to bottom the first t
 
 ## Daily workflow (the part you'll actually use)
 
-From the project folder `c:\Users\bleac\sl\solo_leveling_app`:
+Open a terminal and **first** `cd` into the project folder — git commands only work from inside the repo:
 
 ```bash
-git status                      # see what changed
-git add .                       # stage everything
-git commit -m "what changed"    # save the snapshot
-git push origin main            # send to GitHub → triggers Codemagic
+cd c:/Users/bleac/sl/solo_leveling_app   # MUST do this first every time
+git status                               # see what changed
+git add .                                # stage everything
+git commit -m "what changed"             # save the snapshot
+git push origin main                     # send to GitHub → triggers Codemagic
 ```
+
+> If you're already inside the folder (e.g. a terminal opened there from VS Code), you can skip the `cd`. Check with `pwd` — it should print `/c/Users/bleac/sl/solo_leveling_app`. If it prints anything else, `cd` in first.
 
 That's it. Now go to https://codemagic.io/apps and watch the build run (≈8–15 minutes). When it finishes, the IPA lands in your email.
 
@@ -39,6 +42,7 @@ Your machine uses **Git Credential Manager (GCM)** — it ships with Git for Win
 ### When the picker doesn't pop up (the gotcha we hit)
 
 If `git push` fails with one of these:
+
 - `Permission to chinopoa/solo-leveling-app.git denied to <other-user>` → GCM cached a different GitHub account's credential
 - `Invalid username or token` → cached token expired
 
@@ -84,26 +88,27 @@ Sideloaded apps expire every 7 days (Apple ID limit) and need re-signing — tha
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `Permission denied to <other-user>` on push | GCM cached wrong account | Run the `git credential-manager erase` command above |
-| `Invalid username or token` on push | Cached token expired | Same fix — erase and re-push, picker reappears |
-| Codemagic build doesn't start after push | Auto-trigger disabled, or pushed to wrong branch | Codemagic → app → "Triggers" tab; verify push went to `main` (`git log origin/main` should show your commit) |
-| Build fails on `flutter pub get` | Dependency mismatch from local-only changes | Run `flutter pub get` locally, commit the updated `pubspec.lock` |
-| Build fails on Xcode step | iOS deployment target / pod issues | Check Codemagic log for the Xcode error — usually a quick `Info.plist` or `Podfile` fix |
-| IPA installs but crashes on launch | Hive `typeId` conflict (we've hit this before) | Check `lib/models/*.dart` for duplicate `@HiveType(typeId: N)` |
-| "Your branch is ahead of origin/main by N commits" | Local commits never pushed | `git push origin main` |
+| Symptom                                            | Cause                                            | Fix                                                                                                                |
+| -------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `Permission denied to <other-user>` on push      | GCM cached wrong account                         | Run the `git credential-manager erase` command above                                                             |
+| `Invalid username or token` on push              | Cached token expired                             | Same fix — erase and re-push, picker reappears                                                                    |
+| Codemagic build doesn't start after push           | Auto-trigger disabled, or pushed to wrong branch | Codemagic → app → "Triggers" tab; verify push went to `main` (`git log origin/main` should show your commit) |
+| Build fails on `flutter pub get`                 | Dependency mismatch from local-only changes      | Run `flutter pub get` locally, commit the updated `pubspec.lock`                                               |
+| Build fails on Xcode step                          | iOS deployment target / pod issues               | Check Codemagic log for the Xcode error — usually a quick `Info.plist` or `Podfile` fix                       |
+| IPA installs but crashes on launch                 | Hive `typeId` conflict (we've hit this before) | Check `lib/models/*.dart` for duplicate `@HiveType(typeId: N)`                                                 |
+| "Your branch is ahead of origin/main by N commits" | Local commits never pushed                       | `git push origin main`                                                                                           |
 
 ---
 
 ## Quick reference — the only commands that matter
 
 ```bash
-git status                     # what's changed
-git diff                       # see the actual changes
-git add .                      # stage everything
-git commit -m "message"        # save the snapshot
-git push origin main           # send to GitHub → triggers Codemagic
-git log --oneline -5           # see recent commits
-git remote -v                  # confirm remote URL is correct
+cd c:/Users/bleac/sl/solo_leveling_app   # always start here
+git status                               # what's changed
+git diff                                 # see the actual changes
+git add .                                # stage everything
+git commit -m "message"                  # save the snapshot
+git push origin main                     # send to GitHub → triggers Codemagic
+git log --oneline -5                     # see recent commits
+git remote -v                            # confirm remote URL is correct
 ```
