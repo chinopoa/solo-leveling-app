@@ -78,13 +78,14 @@ class ExerciseAdapter extends TypeAdapter<Exercise> {
       lastPerformedAt: fields[12] as DateTime?,
       lastWeight: fields[13] as double?,
       lastReps: fields[14] as int?,
+      secondaryMuscles: (fields[15] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Exercise obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -114,7 +115,9 @@ class ExerciseAdapter extends TypeAdapter<Exercise> {
       ..writeByte(13)
       ..write(obj.lastWeight)
       ..writeByte(14)
-      ..write(obj.lastReps);
+      ..write(obj.lastReps)
+      ..writeByte(15)
+      ..write(obj.secondaryMuscles);
   }
 
   @override

@@ -48,6 +48,9 @@ dependencies:
   # Swipe-to-delete row actions
   flutter_slidable: ^3.1.0
 
+  # Charts (trendlines for exercise progress and body weight)
+  fl_chart: ^0.68.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

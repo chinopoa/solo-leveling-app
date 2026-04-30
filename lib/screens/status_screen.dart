@@ -55,6 +55,10 @@ class StatusScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              // Body Vitals (current weight + delta + sparkline)
+              _BodyVitalsCard(),
+              const SizedBox(height: 16),
+
               // Quick Stats
               _buildQuickStats(player, game),
             ],
@@ -330,6 +334,165 @@ class _QuickStatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact body-weight summary on the Status screen. Tap the + to log,
+/// shows latest weight, 7-day and 30-day deltas, and a small sparkline.
+/// Full chart and history live in Training → Progress.
+class _BodyVitalsCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<GameProvider>(
+      builder: (context, game, _) {
+        final latest = game.latestBodyWeight;
+        final delta7 = game.bodyWeightDelta(days: 7);
+        final delta30 = game.bodyWeightDelta(days: 30);
+        final entries = game.bodyWeightEntries;
+
+        // Sparkline data: most recent ~30 entries, oldest first.
+        final sparkPoints = [
+          for (final e in entries.take(30).toList().reversed)
+            TrendPoint(e.date, e.weight),
+        ];
+
+        return SystemWindow(
+          title: 'BODY VITALS',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    latest == null ? '—' : latest.toStringAsFixed(1),
+                    style: const TextStyle(
+                      color: SoloLevelingTheme.textPrimary,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: Text(
+                      'kg',
+                      style: TextStyle(
+                        color: SoloLevelingTheme.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (delta7 != null) _MiniDelta(label: '7D', delta: delta7),
+                  if (delta7 != null && delta30 != null) const SizedBox(width: 6),
+                  if (delta30 != null) _MiniDelta(label: '30D', delta: delta30),
+                  IconButton(
+                    onPressed: () => _logWeight(context, game),
+                    icon: const Icon(Icons.add_circle,
+                        color: SoloLevelingTheme.primaryCyan),
+                    tooltip: 'Log weight',
+                  ),
+                ],
+              ),
+              if (sparkPoints.length >= 2) ...[
+                const SizedBox(height: 8),
+                TrendlineChart(
+                  points: sparkPoints,
+                  unit: 'kg',
+                  lineColor: SoloLevelingTheme.successGreen,
+                  height: 80,
+                  showDots: false,
+                ),
+              ] else if (latest == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Tap + to log your first weigh-in.',
+                    style: TextStyle(
+                      color: SoloLevelingTheme.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _logWeight(BuildContext context, GameProvider game) async {
+    final controller = TextEditingController(
+      text: game.latestBodyWeight?.toStringAsFixed(1) ?? '',
+    );
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: SoloLevelingTheme.backgroundCard,
+        title: const Text('LOG WEIGHT',
+            style: TextStyle(
+                color: SoloLevelingTheme.primaryCyan, letterSpacing: 2)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+          decoration: const InputDecoration(
+            labelText: 'Weight (kg)',
+            labelStyle: TextStyle(color: SoloLevelingTheme.textMuted),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('SAVE',
+                style: TextStyle(color: SoloLevelingTheme.primaryCyan)),
+          ),
+        ],
+      ),
+    );
+    if (saved == true) {
+      final w = double.tryParse(controller.text.replaceAll(',', '.'));
+      if (w != null && w > 0) {
+        await game.logBodyWeight(w);
+      }
+    }
+  }
+}
+
+class _MiniDelta extends StatelessWidget {
+  final String label;
+  final double delta;
+  const _MiniDelta({required this.label, required this.delta});
+
+  @override
+  Widget build(BuildContext context) {
+    final isFlat = delta.abs() < 0.05;
+    final color = isFlat
+        ? SoloLevelingTheme.textMuted
+        : (delta > 0
+            ? SoloLevelingTheme.xpGold
+            : SoloLevelingTheme.successGreen);
+    final sign = isFlat ? '±' : (delta > 0 ? '+' : '');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        '$label $sign${delta.toStringAsFixed(1)}',
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

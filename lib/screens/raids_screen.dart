@@ -4,7 +4,7 @@ import '../providers/game_provider.dart';
 import '../theme/solo_leveling_theme.dart';
 import '../widgets/system_window.dart';
 import '../models/models.dart';
-import 'workout_screen.dart';
+import 'quests_screen.dart';
 
 /// Raids Screen - Long-term goals and habit tracking
 class RaidsScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _RaidsScreenState extends State<RaidsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -58,7 +58,8 @@ class _RaidsScreenState extends State<RaidsScreen>
                 ),
                 tabs: const [
                   Tab(text: 'RAIDS'),
-                  Tab(text: 'TRAINING'),
+                  Tab(text: 'QUESTS'),
+                  Tab(text: 'DUNGEONS'),
                   Tab(text: 'REGIMEN'),
                 ],
               ),
@@ -70,7 +71,8 @@ class _RaidsScreenState extends State<RaidsScreen>
                 controller: _tabController,
                 children: [
                   _buildRaidsTab(game),
-                  WorkoutScreen(showHabits: false, game: game),
+                  const QuestsListTab(),
+                  const DungeonsListTab(),
                   _buildRegimenTab(game),
                 ],
               ),

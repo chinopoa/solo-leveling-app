@@ -94,6 +94,10 @@ class Exercise extends HiveObject {
   @HiveField(14)
   int? lastReps;
 
+  /// Secondary muscles hit by this exercise (e.g. Bench Press → triceps, front delts)
+  @HiveField(15)
+  List<String> secondaryMuscles;
+
   Exercise({
     String? id,
     required this.name,
@@ -110,9 +114,32 @@ class Exercise extends HiveObject {
     this.lastPerformedAt,
     this.lastWeight,
     this.lastReps,
+    List<String>? secondaryMuscles,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
-        prHistory = prHistory ?? [];
+        prHistory = prHistory ?? [],
+        secondaryMuscles = secondaryMuscles ?? [];
+
+  /// Resolved secondary muscles — falls back to [ExerciseMuscleMap] lookup by name
+  /// when this exercise has no per-record overrides.
+  List<String> get effectiveSecondaryMuscles {
+    if (secondaryMuscles.isNotEmpty) return secondaryMuscles;
+    return ExerciseMuscleMap.lookup(name);
+  }
+
+  /// All muscles (primary + secondary) this exercise hits, lowercase.
+  Set<String> get allMusclesHit {
+    final all = <String>{muscleGroup};
+    if (armSubGroup != null) all.add(armSubGroup!);
+    all.addAll(effectiveSecondaryMuscles.map((m) => m.toLowerCase()));
+    return all;
+  }
+
+  /// True if this exercise hits the given muscle (as primary or secondary).
+  bool hits(String muscle) {
+    final m = muscle.toLowerCase();
+    return allMusclesHit.contains(m);
+  }
 
   MuscleGroup get muscleGroupEnum => MuscleGroup.values.firstWhere(
         (e) => e.name == muscleGroup,
@@ -262,4 +289,101 @@ class Exercise extends HiveObject {
       Exercise(name: 'Farmers Walk', muscleGroup: 'arms', armSubGroup: 'forearms', iconEmoji: '🚶'),
     ];
   }
+}
+
+/// Curated lookup of which secondary muscles each common exercise hits.
+/// Keys are matched case-insensitively against [Exercise.name]. Used as a
+/// fallback when an exercise has no explicit `secondaryMuscles` set.
+class ExerciseMuscleMap {
+  static const Map<String, List<String>> _table = {
+    // --- Chest ---
+    'bench press': ['triceps', 'shoulders'],
+    'incline bench press': ['triceps', 'shoulders'],
+    'decline bench press': ['triceps'],
+    'dumbbell bench press': ['triceps', 'shoulders'],
+    'dumbbell flys': ['shoulders'],
+    'cable flys': ['shoulders'],
+    'push-ups': ['triceps', 'shoulders', 'core'],
+    'dips': ['triceps', 'shoulders'],
+
+    // --- Back ---
+    'pull-ups': ['biceps', 'forearms'],
+    'chin-ups': ['biceps', 'forearms'],
+    'barbell rows': ['biceps', 'forearms', 'shoulders'],
+    'dumbbell rows': ['biceps', 'forearms'],
+    'seated cable row': ['biceps', 'forearms'],
+    'lat pulldown': ['biceps', 'forearms'],
+    'deadlift': ['legs', 'forearms', 'core', 'shoulders'],
+    't-bar row': ['biceps', 'shoulders'],
+    'face pulls': ['shoulders'],
+
+    // --- Legs ---
+    'squats': ['core', 'back'],
+    'front squats': ['core', 'shoulders'],
+    'leg press': [],
+    'lunges': ['core'],
+    'bulgarian split squats': ['core'],
+    'leg curls': [],
+    'leg extensions': [],
+    'romanian deadlift': ['back', 'forearms'],
+    'hip thrusts': ['core'],
+    'calf raises': [],
+
+    // --- Shoulders ---
+    'overhead press': ['triceps', 'core'],
+    'military press': ['triceps', 'core'],
+    'dumbbell shoulder press': ['triceps'],
+    'arnold press': ['triceps'],
+    'lateral raises': [],
+    'front raises': [],
+    'rear delt flys': ['back'],
+    'upright row': ['biceps', 'forearms'],
+    'shrugs': ['forearms', 'back'],
+
+    // --- Biceps ---
+    'barbell curls': ['forearms'],
+    'dumbbell curls': ['forearms'],
+    'hammer curls': ['forearms'],
+    'preacher curls': ['forearms'],
+    'concentration curls': ['forearms'],
+    'cable curls': ['forearms'],
+
+    // --- Triceps ---
+    'tricep pushdown': [],
+    'skull crushers': ['shoulders'],
+    'tricep dips': ['chest', 'shoulders'],
+    'overhead tricep extension': ['shoulders'],
+    'close grip bench press': ['chest', 'shoulders'],
+
+    // --- Forearms ---
+    'wrist curls': [],
+    'reverse wrist curls': [],
+    'farmers walk': ['shoulders', 'core', 'back'],
+    'dead hang': ['back'],
+  };
+
+  /// Look up curated secondary muscles for an exercise name.
+  /// Returns an empty list if the exercise isn't in the table.
+  static List<String> lookup(String exerciseName) {
+    return _table[exerciseName.trim().toLowerCase()] ?? const [];
+  }
+
+  /// All exercise names known to the curated table.
+  static Iterable<String> get knownNames => _table.keys;
+}
+
+/// One data point on an exercise's progress trendline.
+/// `estimated1Rm` uses the Epley formula: `weight × (1 + reps/30)`.
+class ExerciseProgressPoint {
+  final DateTime date;
+  final double estimated1Rm;
+  final double topWeight;
+  final int topReps;
+
+  const ExerciseProgressPoint({
+    required this.date,
+    required this.estimated1Rm,
+    required this.topWeight,
+    required this.topReps,
+  });
 }

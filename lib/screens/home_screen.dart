@@ -5,7 +5,7 @@ import '../theme/solo_leveling_theme.dart';
 import '../widgets/level_up_overlay.dart';
 import 'status_screen.dart';
 import 'daily_quest_screen.dart';
-import 'quests_screen.dart';
+import 'training_screen.dart';
 import 'hunter_screen.dart';
 import 'raids_screen.dart';
 import 'settings_screen.dart';
@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = const [
     StatusScreen(),
     DailyQuestScreen(),
-    QuestsScreen(),
+    TrainingScreen(),
     RaidsScreen(),
     HunterScreen(),
   ];
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<String> _titles = const [
     'STATUS',
     'DAILY QUEST',
-    'QUESTS',
+    'TRAINING',
     'RAIDS',
     'HUNTER',
   ];
@@ -82,12 +82,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: 'Status',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.fitness_center),
+                      icon: Icon(Icons.assignment),
                       label: 'Daily',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.assignment),
-                      label: 'Quests',
+                      icon: Icon(Icons.fitness_center),
+                      label: 'Training',
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.flag),

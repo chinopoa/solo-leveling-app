@@ -22,6 +22,9 @@ class WorkoutScreen extends StatefulWidget {
 class _WorkoutScreenState extends State<WorkoutScreen> {
   String? _selectedMuscleGroup;
   String? _selectedArmSubGroup;
+  bool _filterToday = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   final List<Map<String, dynamic>> _muscleGroups = [
     {'name': 'chest', 'label': 'CHEST', 'emoji': '💪'},
@@ -36,6 +39,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     {'name': 'triceps', 'label': 'TRICEPS'},
     {'name': 'forearms', 'label': 'FOREARMS'},
   ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +65,37 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     List<Exercise> filteredExercises = game.exercises;
     final todayHabits = game.todayHabits;
 
-    // Filter by muscle group
+    // Free-text search (matches name, primary, sub-group, or any secondary muscle).
+    if (_searchQuery.trim().isNotEmpty) {
+      filteredExercises = game.searchExercises(_searchQuery);
+    }
+
+    // Filter by today's scheduled muscles (from the user's weekly split).
+    if (_filterToday && game.todayScheduledMuscles.isNotEmpty) {
+      final todays = game.todayScheduledMuscles;
+      filteredExercises = filteredExercises
+          .where((e) => todays.any((m) => e.hits(m)))
+          .toList();
+    }
+
+    // Filter by muscle group — now matches *any* muscle the exercise hits
+    // (primary or secondary), so picking "CHEST" surfaces dips, push-ups, etc.
     if (_selectedMuscleGroup != null) {
-      if (_selectedMuscleGroup == 'arms' && _selectedArmSubGroup != null) {
-        filteredExercises = game.getExercisesByArmSubGroup(_selectedArmSubGroup!);
+      final target = (_selectedMuscleGroup == 'arms' &&
+              _selectedArmSubGroup != null)
+          ? _selectedArmSubGroup!
+          : _selectedMuscleGroup!;
+      if (_selectedMuscleGroup == 'arms' && _selectedArmSubGroup == null) {
+        // "ARMS" with no sub-group = biceps OR triceps OR forearms
+        filteredExercises = filteredExercises
+            .where((e) =>
+                e.hits('biceps') ||
+                e.hits('triceps') ||
+                e.hits('forearms'))
+            .toList();
       } else {
-        filteredExercises = game.getExercisesByMuscleGroup(_selectedMuscleGroup!);
+        filteredExercises =
+            filteredExercises.where((e) => e.hits(target)).toList();
       }
     }
 
@@ -210,7 +244,45 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
           const SizedBox(height: 12),
 
-          // Muscle Group Filter
+          // Search bar — matches exercise name, primary muscle, sub-group, or
+          // any secondary muscle. Type "triceps" and you'll get bench press too.
+          Container(
+            decoration: BoxDecoration(
+              color: SoloLevelingTheme.backgroundCard,
+              border: Border.all(
+                color: SoloLevelingTheme.primaryCyan.withValues(alpha: 0.25),
+              ),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: SoloLevelingTheme.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Search by exercise or muscle…',
+                hintStyle:
+                    TextStyle(color: SoloLevelingTheme.textMuted, fontSize: 13),
+                prefixIcon: const Icon(Icons.search,
+                    color: SoloLevelingTheme.textMuted, size: 20),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear,
+                            size: 18, color: SoloLevelingTheme.textMuted),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      ),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              ),
+              onChanged: (v) => setState(() => _searchQuery = v),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Today (from split) + muscle group filter chips
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -223,6 +295,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   _selectedArmSubGroup = null;
                 }),
               ),
+              if (game.todayScheduledMuscles.isNotEmpty)
+                _buildTodayChip(game),
               ..._muscleGroups.map((group) => _buildFilterChip(
                     label: group['label'],
                     emoji: group['emoji'],
@@ -515,6 +589,46 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  Widget _buildTodayChip(GameProvider game) {
+    final muscles = game.todayScheduledMuscles;
+    final label = muscles.map((m) => m.toUpperCase()).join('/');
+    final isSelected = _filterToday;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _filterToday = !_filterToday;
+        if (_filterToday) {
+          _selectedMuscleGroup = null;
+          _selectedArmSubGroup = null;
+        }
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? SoloLevelingTheme.accentPurple.withValues(alpha: 0.2)
+              : SoloLevelingTheme.backgroundCard,
+          border: Border.all(
+            color: isSelected
+                ? SoloLevelingTheme.accentPurple
+                : SoloLevelingTheme.accentPurple.withValues(alpha: 0.4),
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'TODAY · $label',
+          style: TextStyle(
+            color: isSelected
+                ? SoloLevelingTheme.accentPurple
+                : SoloLevelingTheme.accentPurple.withValues(alpha: 0.85),
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterChip({
     required String label,
     String? emoji,
@@ -637,6 +751,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                           fontSize: 11,
                         ),
                       ),
+                      if (exercise.effectiveSecondaryMuscles.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Also: ${exercise.effectiveSecondaryMuscles.join(", ")}',
+                          style: TextStyle(
+                            color: SoloLevelingTheme.textMuted
+                                .withValues(alpha: 0.7),
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                       if (exercise.currentPRWeight != null) ...[
                         const SizedBox(height: 4),
                         Row(

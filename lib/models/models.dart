@@ -21,3 +21,5 @@ export 'activity_log.dart';
 export 'exercise.dart';
 export 'workout_set.dart';
 export 'workout_session.dart';
+export 'workout_split.dart';
+export 'body_weight_entry.dart';

@@ -6,3 +6,6 @@ export 'hunter_screen.dart';
 export 'raids_screen.dart';
 export 'onboarding_screen.dart';
 export 'settings_screen.dart';
+export 'training_screen.dart';
+export 'schedule_screen.dart';
+export 'progress_screen.dart';

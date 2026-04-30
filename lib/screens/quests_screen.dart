@@ -62,8 +62,8 @@ class _QuestsScreenState extends State<QuestsScreen>
           child: TabBarView(
             controller: _tabController,
             children: const [
-              _QuestsTab(),
-              _DungeonsTab(),
+              QuestsListTab(),
+              DungeonsListTab(),
             ],
           ),
         ),
@@ -72,14 +72,14 @@ class _QuestsScreenState extends State<QuestsScreen>
   }
 }
 
-class _QuestsTab extends StatefulWidget {
-  const _QuestsTab();
+class QuestsListTab extends StatefulWidget {
+  const QuestsListTab({super.key});
 
   @override
-  State<_QuestsTab> createState() => _QuestsTabState();
+  State<QuestsListTab> createState() => _QuestsTabState();
 }
 
-class _QuestsTabState extends State<_QuestsTab> {
+class _QuestsTabState extends State<QuestsListTab> {
   bool _showScheduled = false;
 
   @override
@@ -479,8 +479,8 @@ class _QuestsTabState extends State<_QuestsTab> {
   }
 }
 
-class _DungeonsTab extends StatelessWidget {
-  const _DungeonsTab();
+class DungeonsListTab extends StatelessWidget {
+  const DungeonsListTab({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -30,6 +30,8 @@ class GameProvider extends ChangeNotifier {
   // Workout/Training boxes
   late Box<Exercise> _exerciseBox;
   late Box<WorkoutSession> _workoutSessionBox;
+  late Box<WorkoutSplit> _workoutSplitBox;
+  late Box<BodyWeightEntry> _bodyWeightBox;
 
   Player? _player;
   List<Quest> _quests = [];
@@ -59,6 +61,8 @@ class GameProvider extends ChangeNotifier {
   List<Exercise> _exercises = [];
   List<WorkoutSession> _workoutSessions = [];
   WorkoutSession? _activeWorkout;
+  WorkoutSplit? _workoutSplit;
+  List<BodyWeightEntry> _bodyWeightEntries = [];
 
   // Level up state
   bool _showLevelUp = false;
@@ -244,6 +248,8 @@ class GameProvider extends ChangeNotifier {
     // Open workout/training boxes
     _exerciseBox = await Hive.openBox<Exercise>('exercises');
     _workoutSessionBox = await Hive.openBox<WorkoutSession>('workoutSessions');
+    _workoutSplitBox = await Hive.openBox<WorkoutSplit>('workoutSplits');
+    _bodyWeightBox = await Hive.openBox<BodyWeightEntry>('bodyWeights');
 
     // Load auto-backup setting
     final prefs = await SharedPreferences.getInstance();
@@ -356,6 +362,17 @@ class GameProvider extends ChangeNotifier {
     } catch (e) {
       _activeWorkout = null;
     }
+
+    // Load or create default workout split
+    _workoutSplit = _workoutSplitBox.get(WorkoutSplit.boxKey);
+    if (_workoutSplit == null) {
+      _workoutSplit = WorkoutSplit.defaults();
+      await _workoutSplitBox.put(WorkoutSplit.boxKey, _workoutSplit!);
+    }
+
+    // Load body weight entries (most recent first)
+    _bodyWeightEntries = _bodyWeightBox.values.toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
   }
 
   Future<void> _loadNutritionData() async {
@@ -1452,6 +1469,166 @@ class GameProvider extends ChangeNotifier {
     await exercise.save();
     notifyListeners();
     _triggerAutoBackup();
+  }
+
+  /// Update an exercise's secondary muscles (UI override of curated map)
+  Future<void> updateExerciseSecondaryMuscles(
+      String exerciseId, List<String> secondaryMuscles) async {
+    final exercise = getExerciseById(exerciseId);
+    if (exercise == null) return;
+
+    exercise.secondaryMuscles = secondaryMuscles;
+    await exercise.save();
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Find exercises by free-text query against name and any muscle hit
+  /// (primary, arm sub-group, or secondary). Empty query returns all.
+  List<Exercise> searchExercises(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return _exercises;
+    return _exercises.where((e) {
+      if (e.name.toLowerCase().contains(q)) return true;
+      if (e.muscleGroup.toLowerCase().contains(q)) return true;
+      if (e.armSubGroup != null && e.armSubGroup!.toLowerCase().contains(q)) {
+        return true;
+      }
+      for (final m in e.effectiveSecondaryMuscles) {
+        if (m.toLowerCase().contains(q)) return true;
+      }
+      return false;
+    }).toList();
+  }
+
+  /// Get all exercises that hit a given muscle (primary or secondary).
+  List<Exercise> getExercisesHittingMuscle(String muscle) {
+    final m = muscle.toLowerCase();
+    return _exercises.where((e) => e.hits(m)).toList();
+  }
+
+  // -------------------- Workout Split (Schedule) --------------------
+
+  /// The user's active weekly split.
+  WorkoutSplit get workoutSplit => _workoutSplit ?? WorkoutSplit.defaults();
+
+  /// Muscles scheduled for today.
+  List<String> get todayScheduledMuscles => workoutSplit.today;
+
+  /// Exercises in the skill book that match today's scheduled muscles.
+  List<Exercise> get todayScheduledExercises {
+    final muscles = todayScheduledMuscles;
+    if (muscles.isEmpty) return const [];
+    return _exercises
+        .where((e) => muscles.any((m) => e.hits(m)))
+        .toList();
+  }
+
+  /// Replace the muscles for one weekday.
+  Future<void> setSplitForWeekday(int weekday, List<String> muscles) async {
+    final split = _workoutSplit ?? WorkoutSplit.defaults();
+    split.setForWeekday(weekday, muscles);
+    if (split.isInBox) {
+      await split.save();
+    } else {
+      await _workoutSplitBox.put(WorkoutSplit.boxKey, split);
+    }
+    _workoutSplit = split;
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  /// Replace the entire split (e.g. when applying a preset).
+  Future<void> setWorkoutSplit(WorkoutSplit split) async {
+    await _workoutSplitBox.put(WorkoutSplit.boxKey, split);
+    _workoutSplit = split;
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  // -------------------- Body Weight --------------------
+
+  /// All body-weight entries, newest first.
+  List<BodyWeightEntry> get bodyWeightEntries => _bodyWeightEntries;
+
+  /// Most recent body weight, or null if none logged.
+  double? get latestBodyWeight =>
+      _bodyWeightEntries.isEmpty ? null : _bodyWeightEntries.first.weight;
+
+  /// Body weight from N days ago (closest entry on or before that date).
+  double? bodyWeightAt(DateTime when) {
+    final entries = _bodyWeightEntries
+        .where((e) => !e.date.isAfter(when))
+        .toList();
+    if (entries.isEmpty) return null;
+    return entries.first.weight;
+  }
+
+  /// Difference between latest and oldest entry within [days] window.
+  /// Positive = gained, negative = lost, null if not enough data.
+  double? bodyWeightDelta({int days = 30}) {
+    if (_bodyWeightEntries.length < 2) return null;
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final inWindow =
+        _bodyWeightEntries.where((e) => !e.date.isBefore(cutoff)).toList();
+    if (inWindow.length < 2) return null;
+    final latest = inWindow.first.weight;
+    final earliest = inWindow.last.weight;
+    return latest - earliest;
+  }
+
+  Future<void> logBodyWeight(double weight, {DateTime? date, String? note}) async {
+    final entry = BodyWeightEntry(weight: weight, date: date, note: note);
+    await _bodyWeightBox.put(entry.id, entry);
+    _bodyWeightEntries
+      ..add(entry)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  Future<void> deleteBodyWeightEntry(String id) async {
+    await _bodyWeightBox.delete(id);
+    _bodyWeightEntries.removeWhere((e) => e.id == id);
+    notifyListeners();
+    _triggerAutoBackup();
+  }
+
+  // -------------------- Exercise progress history --------------------
+
+  /// Build a per-session progress series for an exercise.
+  /// Each point is the best estimated 1RM (Epley: w × (1 + r/30)) of any
+  /// set in that session, paired with the session's start date.
+  /// Sorted oldest → newest. Empty if no completed sessions used this exercise.
+  List<ExerciseProgressPoint> exerciseProgressSeries(String exerciseId) {
+    final completed = _workoutSessions
+        .where((w) => !w.isActive && w.exerciseIds.contains(exerciseId))
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    final points = <ExerciseProgressPoint>[];
+    for (final session in completed) {
+      final sets = session.getSetsForExercise(exerciseId);
+      if (sets.isEmpty) continue;
+      double bestEst1Rm = 0;
+      double topWeight = 0;
+      int topReps = 0;
+      for (final s in sets) {
+        final est = s.weight * (1 + s.reps / 30.0);
+        if (est > bestEst1Rm) {
+          bestEst1Rm = est;
+          topWeight = s.weight;
+          topReps = s.reps;
+        }
+      }
+      points.add(ExerciseProgressPoint(
+        date: session.startTime,
+        estimated1Rm: bestEst1Rm,
+        topWeight: topWeight,
+        topReps: topReps,
+      ));
+    }
+    return points;
   }
 
   // ==================== RESET METHODS ====================
